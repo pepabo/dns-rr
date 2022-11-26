@@ -1,0 +1,6 @@
+domain: ch1aki.github.io
+layout:
+- go.kubebuilder.io/v3
+projectName: dns-rr
+repo: github.com/ch1aki/dns-rr
+version: "3"
