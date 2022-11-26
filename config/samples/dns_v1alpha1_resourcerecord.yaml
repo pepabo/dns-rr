@@ -1,0 +1,12 @@
+apiVersion: dns.ch1aki.github.io/v1alpha1
+kind: ResourceRecord
+metadata:
+  labels:
+    app.kubernetes.io/name: resourcerecord
+    app.kubernetes.io/instance: resourcerecord-sample
+    app.kubernetes.io/part-of: dns-rr
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: dns-rr
+  name: resourcerecord-sample
+spec:
+  # TODO(user): Add fields here

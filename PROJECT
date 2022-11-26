@@ -3,4 +3,14 @@ layout:
 - go.kubebuilder.io/v3
 projectName: dns-rr
 repo: github.com/ch1aki/dns-rr
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: ch1aki.github.io
+  group: dns
+  kind: ResourceRecord
+  path: github.com/ch1aki/dns-rr/api/v1alpha1
+  version: v1alpha1
 version: "3"
