@@ -96,6 +96,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ResourceRecord")
 		os.Exit(1)
 	}
+	if err = (&dnsv1alpha1.ResourceRecordOwner{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ResourceRecordOwner")
+		os.Exit(1)
+	}
+	if err = (&dnsv1alpha1.ResourceRecord{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ResourceRecord")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

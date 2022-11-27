@@ -1,0 +1,94 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dns-ch1aki-github-io-v1alpha1-resourcerecord
+  failurePolicy: Fail
+  name: mresourcerecord.kb.io
+  rules:
+  - apiGroups:
+    - dns.ch1aki.github.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - resourcerecords
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dns-ch1aki-github-io-v1alpha1-resourcerecordowner
+  failurePolicy: Fail
+  name: mresourcerecordowner.kb.io
+  rules:
+  - apiGroups:
+    - dns.ch1aki.github.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - resourcerecordowners
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dns-ch1aki-github-io-v1alpha1-resourcerecord
+  failurePolicy: Fail
+  name: vresourcerecord.kb.io
+  rules:
+  - apiGroups:
+    - dns.ch1aki.github.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - resourcerecords
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dns-ch1aki-github-io-v1alpha1-resourcerecordowner
+  failurePolicy: Fail
+  name: vresourcerecordowner.kb.io
+  rules:
+  - apiGroups:
+    - dns.ch1aki.github.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - resourcerecordowners
+  sideEffects: None
