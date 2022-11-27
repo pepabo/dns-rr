@@ -23,25 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ResourceRecordSpec defines the desired state of ResourceRecord
-type ResourceRecordSpec struct {
+// OwnerSpec defines the desired state of Owner
+type OwnerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// +kubebuilder:validation:Enum=A;NS;AAAA;MX;CNAME;SRV;TXT;ALIAS
-	Class string `json:"class"`
-
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=2147483647
-	Ttl int32 `json:"ttl"`
-
-	OwnerRef string `json:"ownerRef"`
-
-	Rdata string `json:"rdata"`
+	// Foo is an example field of Owner. Edit owner_types.go to remove/update
+	Foo string `json:"foo,omitempty"`
 }
 
-// ResourceRecordStatus defines the observed state of ResourceRecord
-type ResourceRecordStatus struct {
+// OwnerStatus defines the observed state of Owner
+type OwnerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -49,24 +41,24 @@ type ResourceRecordStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// ResourceRecord is the Schema for the resourcerecords API
-type ResourceRecord struct {
+// Owner is the Schema for the owners API
+type Owner struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ResourceRecordSpec   `json:"spec,omitempty"`
-	Status ResourceRecordStatus `json:"status,omitempty"`
+	Spec   OwnerSpec   `json:"spec,omitempty"`
+	Status OwnerStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ResourceRecordList contains a list of ResourceRecord
-type ResourceRecordList struct {
+// OwnerList contains a list of Owner
+type OwnerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourceRecord `json:"items"`
+	Items           []Owner `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ResourceRecord{}, &ResourceRecordList{})
+	SchemeBuilder.Register(&Owner{}, &OwnerList{})
 }

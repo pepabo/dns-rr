@@ -1,0 +1,12 @@
+apiVersion: dns.ch1aki.github.io/v1alpha1
+kind: Owner
+metadata:
+  labels:
+    app.kubernetes.io/name: owner
+    app.kubernetes.io/instance: owner-sample
+    app.kubernetes.io/part-of: dns-rr
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: dns-rr
+  name: owner-sample
+spec:
+  # TODO(user): Add fields here

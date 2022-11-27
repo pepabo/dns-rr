@@ -5,20 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: resourcerecords.dns.ch1aki.github.io
+  name: owners.dns.ch1aki.github.io
 spec:
   group: dns.ch1aki.github.io
   names:
-    kind: ResourceRecord
-    listKind: ResourceRecordList
-    plural: resourcerecords
-    singular: resourcerecord
+    kind: Owner
+    listKind: OwnerList
+    plural: owners
+    singular: owner
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ResourceRecord is the Schema for the resourcerecords API
+        description: Owner is the Schema for the owners API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,33 +33,15 @@ spec:
           metadata:
             type: object
           spec:
-            description: ResourceRecordSpec defines the desired state of ResourceRecord
+            description: OwnerSpec defines the desired state of Owner
             properties:
-              class:
-                enum:
-                - A
-                - NS
-                - AAAA
-                - MX
-                - CNAME
-                - SRV
-                - TXT
-                - ALIAS
+              foo:
+                description: Foo is an example field of Owner. Edit owner_types.go
+                  to remove/update
                 type: string
-              rdata:
-                type: string
-              ttl:
-                format: int32
-                maximum: 2147483647
-                minimum: 0
-                type: integer
-            required:
-            - class
-            - rdata
-            - ttl
             type: object
           status:
-            description: ResourceRecordStatus defines the observed state of ResourceRecord
+            description: OwnerStatus defines the observed state of Owner
             type: object
         type: object
     served: true

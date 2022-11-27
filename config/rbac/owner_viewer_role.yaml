@@ -1,0 +1,27 @@
+# permissions for end users to view owners.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: owner-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: dns-rr
+    app.kubernetes.io/part-of: dns-rr
+    app.kubernetes.io/managed-by: kustomize
+  name: owner-viewer-role
+rules:
+- apiGroups:
+  - dns.ch1aki.github.io
+  resources:
+  - owners
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - dns.ch1aki.github.io
+  resources:
+  - owners/status
+  verbs:
+  - get
