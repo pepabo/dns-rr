@@ -36,10 +36,13 @@ spec:
           spec:
             description: ResourceRecordOwnerSpec defines the desired state of ResourceRecordOwner
             properties:
-              foo:
-                description: Foo is an example field of ResourceRecordOwner. Edit
-                  resourcerecordowner_types.go to remove/update
-                type: string
+              names:
+                items:
+                  type: string
+                type: array
+                uniqueItems: true
+            required:
+            - names
             type: object
           status:
             description: ResourceRecordOwnerStatus defines the observed state of ResourceRecordOwner

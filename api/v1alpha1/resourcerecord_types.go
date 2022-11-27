@@ -28,8 +28,16 @@ type ResourceRecordSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ResourceRecord. Edit resourcerecord_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Enum=A;NS;AAAA;MX;CNAME;SRV;TXT;ALIAS
+	Class string `json:"class"`
+
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=2147483647
+	Ttl int32 `json:"ttl"`
+
+	OwnerRef ResourceRecordOwner `json:"ownerRef"`
+
+	Rdata string `json:"rdata"`
 }
 
 // ResourceRecordStatus defines the observed state of ResourceRecord

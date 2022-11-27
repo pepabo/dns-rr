@@ -35,10 +35,64 @@ spec:
           spec:
             description: ResourceRecordSpec defines the desired state of ResourceRecord
             properties:
-              foo:
-                description: Foo is an example field of ResourceRecord. Edit resourcerecord_types.go
-                  to remove/update
+              class:
+                enum:
+                - A
+                - NS
+                - AAAA
+                - MX
+                - CNAME
+                - SRV
+                - TXT
+                - ALIAS
                 type: string
+              ownerRef:
+                description: ResourceRecordOwner is the Schema for the resourcerecordowners
+                  API
+                properties:
+                  apiVersion:
+                    description: 'APIVersion defines the versioned schema of this
+                      representation of an object. Servers should convert recognized
+                      schemas to the latest internal value, and may reject unrecognized
+                      values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                    type: string
+                  kind:
+                    description: 'Kind is a string value representing the REST resource
+                      this object represents. Servers may infer this from the endpoint
+                      the client submits requests to. Cannot be updated. In CamelCase.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                    type: string
+                  metadata:
+                    type: object
+                  spec:
+                    description: ResourceRecordOwnerSpec defines the desired state
+                      of ResourceRecordOwner
+                    properties:
+                      names:
+                        items:
+                          type: string
+                        type: array
+                        uniqueItems: true
+                    required:
+                    - names
+                    type: object
+                  status:
+                    description: ResourceRecordOwnerStatus defines the observed state
+                      of ResourceRecordOwner
+                    type: object
+                type: object
+              rdata:
+                type: string
+              ttl:
+                format: int32
+                maximum: 2147483647
+                minimum: 0
+                type: integer
+            required:
+            - class
+            - ownerRef
+            - rdata
+            - ttl
             type: object
           status:
             description: ResourceRecordStatus defines the observed state of ResourceRecord
