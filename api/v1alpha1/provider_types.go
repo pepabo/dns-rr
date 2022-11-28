@@ -23,27 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ResourceRecordSpec defines the desired state of ResourceRecord
-type ResourceRecordSpec struct {
+// ProviderSpec defines the desired state of Provider
+type ProviderSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// +kubebuilder:validation:Enum=A;NS;AAAA;MX;CNAME;SRV;TXT;ALIAS
-	Class string `json:"class"`
-
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=2147483647
-	Ttl int32 `json:"ttl"`
-
-	OwnerRef string `json:"ownerRef"`
-
-        ProviderRef string `json:"providerRef"`
-
-	Rdata string `json:"rdata"`
+	// Foo is an example field of Provider. Edit provider_types.go to remove/update
+	Foo string `json:"foo,omitempty"`
 }
 
-// ResourceRecordStatus defines the observed state of ResourceRecord
-type ResourceRecordStatus struct {
+// ProviderStatus defines the observed state of Provider
+type ProviderStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -51,24 +41,24 @@ type ResourceRecordStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// ResourceRecord is the Schema for the resourcerecords API
-type ResourceRecord struct {
+// Provider is the Schema for the providers API
+type Provider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ResourceRecordSpec   `json:"spec,omitempty"`
-	Status ResourceRecordStatus `json:"status,omitempty"`
+	Spec   ProviderSpec   `json:"spec,omitempty"`
+	Status ProviderStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ResourceRecordList contains a list of ResourceRecord
-type ResourceRecordList struct {
+// ProviderList contains a list of Provider
+type ProviderList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourceRecord `json:"items"`
+	Items           []Provider `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ResourceRecord{}, &ResourceRecordList{})
+	SchemeBuilder.Register(&Provider{}, &ProviderList{})
 }
