@@ -46,6 +46,8 @@ spec:
                 - TXT
                 - ALIAS
                 type: string
+              ownerRef:
+                type: string
               rdata:
                 type: string
               ttl:
@@ -55,6 +57,7 @@ spec:
                 type: integer
             required:
             - class
+            - ownerRef
             - rdata
             - ttl
             type: object
