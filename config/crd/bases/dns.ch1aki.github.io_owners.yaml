@@ -35,10 +35,14 @@ spec:
           spec:
             description: OwnerSpec defines the desired state of Owner
             properties:
-              foo:
+              names:
                 description: Foo is an example field of Owner. Edit owner_types.go
                   to remove/update
-                type: string
+                items:
+                  type: string
+                type: array
+            required:
+            - names
             type: object
           status:
             description: OwnerStatus defines the observed state of Owner

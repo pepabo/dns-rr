@@ -25,11 +25,7 @@ import (
 
 // ProviderSpec defines the desired state of Provider
 type ProviderSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of Provider. Edit provider_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+        Route53 Route53Provider `json:"route53,omitempty"`
 }
 
 // ProviderStatus defines the observed state of Provider

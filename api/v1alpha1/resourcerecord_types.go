@@ -37,7 +37,7 @@ type ResourceRecordSpec struct {
 
 	OwnerRef string `json:"ownerRef"`
 
-        ProviderRef string `json:"providerRef"`
+	ProviderRef string `json:"providerRef"`
 
 	Rdata string `json:"rdata"`
 }

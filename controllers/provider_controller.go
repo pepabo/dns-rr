@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,9 +48,24 @@ type ProviderReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+        logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+        var p dnsv1alpha1.Provider
+        err := r.Get(ctx, req.NamespacedName, &p)
+        if errors.IsNotFound(err) {
+                return ctrl.Result{}, nil
+        }
+        if err != nil {
+                logger.Error(err, "unable to get Provider", "name", req.NamespacedName)
+                return ctrl.Result{}, err
+        }
+
+        if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+                return ctrl.Result{}, nil
+        }
+
+        // TODO(validation):
+        // TODO(reconcile):
 
 	return ctrl.Result{}, nil
 }

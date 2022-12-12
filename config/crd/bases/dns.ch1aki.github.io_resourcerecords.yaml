@@ -48,6 +48,8 @@ spec:
                 type: string
               ownerRef:
                 type: string
+              providerRef:
+                type: string
               rdata:
                 type: string
               ttl:
@@ -58,6 +60,7 @@ spec:
             required:
             - class
             - ownerRef
+            - providerRef
             - rdata
             - ttl
             type: object

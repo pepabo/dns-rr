@@ -29,7 +29,7 @@ type OwnerSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Owner. Edit owner_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Names []string `json:"names"`
 }
 
 // OwnerStatus defines the observed state of Owner

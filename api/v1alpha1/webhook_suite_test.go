@@ -99,9 +99,6 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&ResourceRecordOwner{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
-
 	err = (&ResourceRecord{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 

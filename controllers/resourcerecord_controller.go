@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
+	"github.com/ch1aki/dns-rr/controllers/provider"
 )
 
 // ResourceRecordReconciler reconciles a ResourceRecord object
@@ -40,25 +40,56 @@ type ResourceRecordReconciler struct {
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=resourcerecords/finalizers,verbs=update
 
 func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-        logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-        var rr dnsv1alpha1.ResourceRecord
-        err := r.Get(ctx, req.NamespacedName, &rr)
-        if errors.IsNotFound(err) {
-                return ctrl.Result{}, nil
-        }
-        if err != nil {
-                logger.Error(err, "unable to get ResourceRecord", "name", req.NamespacedName)
-                return ctrl.Result{}, err
-        }
+	var rr dnsv1alpha1.ResourceRecord
+	err := r.Get(ctx, req.NamespacedName, &rr)
+	if errors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	}
+	if err != nil {
+		logger.Error(err, "unable to get ResourceRecord", "name", req.NamespacedName)
+		return ctrl.Result{}, err
+	}
 
-        if !rr.ObjectMeta.DeletionTimestamp.IsZero() {
-                return ctrl.Result{}, nil
-        }
+	if !rr.ObjectMeta.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
+	}
 
-        // main logic
-        var owner dnsv1alpha1.ResourceRecordOwner
-        owner = rr.Spec.OwnerRef
+	// main logic
+
+	// get owner object
+	var owner dnsv1alpha1.Owner
+	err = r.Get(ctx, client.ObjectKey{Namespace: rr.Namespace, Name: rr.Spec.OwnerRef}, &owner)
+	if errors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	}
+	if err != nil {
+		logger.Error(err, "unable to get ResourceRecord", "name", rr.Namespace+"/"+rr.Spec.OwnerRef)
+		return ctrl.Result{}, err
+	}
+
+	// get provider object
+	var p dnsv1alpha1.Provider
+	err = r.Get(ctx, client.ObjectKey{Namespace: rr.Namespace, Name: rr.Spec.ProviderRef}, &p)
+	if errors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	}
+	if err != nil {
+		logger.Error(err, "unable to get ResourceRecord", "name", rr.Namespace+"/"+rr.Spec.ProviderRef)
+		return ctrl.Result{}, err
+	}
+
+	// setup client
+	var route53 provider.Route53Provider
+	client, err := route53.NewClient(ctx, &p, r.Client)
+	if err != nil {
+		logger.Error(err, "failed initialize client")
+	}
+
+	// converge
+	test := []string{"example"}
+	_ = client.Converge(ctx, test, rr)
 
 	return ctrl.Result{}, nil
 }
