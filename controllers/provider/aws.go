@@ -76,29 +76,38 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 
 func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName string, owners []string, rrSpec dnsv1alpha1.ResourceRecordSpec) error {
         var changes []types.Change
-
-        currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class)
-        if err != nil {
-                return err
-        }
         desired := endpoint{
                 class: rrSpec.Class,
                 rdata: rrSpec.Rdata,
                 ttl: int64(rrSpec.Ttl),
         }
+
+        currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class)
+        if err != nil {
+                return err
+        }
+
         for _, owner := range owners {
+                fqdn := buildFQDN(owner, zoneName) 
+                desired.dnsName = fqdn
+                c := types.Change{
+                        ResourceRecordSet: &types.ResourceRecordSet{
+                                Name: aws.String(fqdn),
+                                Type: types.RRType(desired.class),
+                                ResourceRecords: []types.ResourceRecord{{Value: &desired.rdata}},
+                                TTL: &desired.ttl,
+                        },
+                }
                 if _, exist := currentRecords[owner]; !exist {
                         // レコードが存在しなかった場合
-                        // TODO: レコード追加処理
-                        c := types.Change{}
+                        c.Action = types.ChangeActionCreate
                         changes = append(changes, c)
-                } else if desired.dnsName = buildFQDN(owner, zoneName); desired != currentRecords[owner] {
+                } else if desired != currentRecords[owner] {
                         // 値が異なる場合
-                        c := types.Change{}
+                        c.Action = types.ChangeActionUpsert
                         changes = append(changes, c)
                 }
         }
-
 
         // 更新
         for i:=0; i<len(changes); i++ {
