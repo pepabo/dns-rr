@@ -75,42 +75,19 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 }
 
 func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName string, owners []string, rrSpec dnsv1alpha1.ResourceRecordSpec) error {
-        var changes []types.Change
         desired := endpoint{
                 class: rrSpec.Class,
                 rdata: rrSpec.Rdata,
                 ttl: int64(rrSpec.Ttl),
         }
-
         currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class)
         if err != nil {
                 return err
         }
-
-        for _, owner := range owners {
-                fqdn := buildFQDN(owner, zoneName) 
-                desired.dnsName = fqdn
-                c := types.Change{
-                        ResourceRecordSet: &types.ResourceRecordSet{
-                                Name: aws.String(fqdn),
-                                Type: types.RRType(desired.class),
-                                ResourceRecords: []types.ResourceRecord{{Value: &desired.rdata}},
-                                TTL: &desired.ttl,
-                        },
-                }
-                if _, exist := currentRecords[owner]; !exist {
-                        // レコードが存在しなかった場合
-                        c.Action = types.ChangeActionCreate
-                        changes = append(changes, c)
-                } else if desired != currentRecords[owner] {
-                        // 値が異なる場合
-                        c.Action = types.ChangeActionUpsert
-                        changes = append(changes, c)
-                }
-        }
+        changes := diff(owners, zoneName, desired, currentRecords)
 
         // 更新
-        for i:=0; i<len(changes); i++ {
+        if 0<len(changes) {
                 changeRrsInput := route53.ChangeResourceRecordSetsInput{
                         HostedZoneId: &zoneId,
                         ChangeBatch: &types.ChangeBatch{
@@ -123,6 +100,33 @@ func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName s
         }
 
 	return nil
+}
+
+func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[string]endpoint) []types.Change {
+        var changes []types.Change
+
+        for _, owner := range owners {
+                fqdn := buildFQDN(owner, zoneName) 
+                desiredEp.dnsName = fqdn
+                c := types.Change{
+                        ResourceRecordSet: &types.ResourceRecordSet{
+                                Name: aws.String(fqdn),
+                                Type: types.RRType(desiredEp.class),
+                                ResourceRecords: []types.ResourceRecord{{Value: &desiredEp.rdata}},
+                                TTL: &desiredEp.ttl,
+                        },
+                }
+                if _, exist := actualEps[owner]; !exist {
+                        // レコードが存在しなかった場合
+                        c.Action = types.ChangeActionCreate
+                        changes = append(changes, c)
+                } else if desiredEp != actualEps[owner] {
+                        // 値が異なる場合
+                        c.Action = types.ChangeActionUpsert
+                        changes = append(changes, c)
+                }
+        }
+        return changes
 }
 
 func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string) (map[string]endpoint, error) {
