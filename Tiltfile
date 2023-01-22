@@ -39,7 +39,7 @@ def kubebuilder(DOMAIN, GROUP, VERSION, KIND, IMG='controller:latest', CONTROLLE
 
     local_resource('Watch&Compile', generate() + binary(), deps=deps, ignore=['*/*/zz_generated.deepcopy.go'])
 
-    local_resource('Sample YAML', 'kubectl apply -f ./config/samples', deps=["./config/samples"], resource_deps=["resourcerecord-controller-controller-manager"])
+    local_resource('Sample YAML', 'kubectl apply -f ./config/samples', deps=["./config/samples"])
 
     docker_build_with_restart(IMG, '.',
      dockerfile_contents=DOCKERFILE,
