@@ -38,6 +38,9 @@ type ResourceRecordReconciler struct {
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=resourcerecords,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=resourcerecords/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=resourcerecords/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=owners,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=owners/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=owners/finalizers,verbs=update
 
 func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)

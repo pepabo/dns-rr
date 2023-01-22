@@ -8,6 +8,32 @@ rules:
 - apiGroups:
   - dns.ch1aki.github.io
   resources:
+  - owners
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dns.ch1aki.github.io
+  resources:
+  - owners/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dns.ch1aki.github.io
+  resources:
+  - owners/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dns.ch1aki.github.io
+  resources:
   - providers
   verbs:
   - create
