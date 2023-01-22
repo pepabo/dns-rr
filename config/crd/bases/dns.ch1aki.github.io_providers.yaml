@@ -81,10 +81,13 @@ spec:
                     type: object
                   hostedZoneID:
                     type: string
+                  hostedZoneName:
+                    type: string
                   region:
                     type: string
                 required:
                 - hostedZoneID
+                - hostedZoneName
                 type: object
             type: object
           status:

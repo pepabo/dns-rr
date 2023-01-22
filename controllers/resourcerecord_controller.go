@@ -88,8 +88,7 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// converge
-	test := []string{"example"}
-	_ = client.Converge(ctx, test, rr)
+	_ = client.Converge(ctx, p.Spec.Route53.HostedZoneID, p.Spec.Route53.HostedZoneName, owner.Spec.Names, rr.Spec)
 
 	return ctrl.Result{}, nil
 }

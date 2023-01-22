@@ -15,6 +15,8 @@ type AWSAuthSecretRef struct {
 type Route53Provider struct {
 	HostedZoneID string `json:"hostedZoneID"`
 
+	HostedZoneName string `json:"hostedZoneName"`
+
 	// +optional
 	Region string `json:"region"`
 
