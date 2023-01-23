@@ -9,4 +9,5 @@ metadata:
     app.kubernetes.io/created-by: dns-rr
   name: owner-sample
 spec:
-  # TODO(user): Add fields here
+  names:
+    - example
