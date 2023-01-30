@@ -20,13 +20,24 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
 	"github.com/ch1aki/dns-rr/controllers/provider"
+)
+
+const (
+	ownerField = ".spec.ownerRef"
 )
 
 // ResourceRecordReconciler reconciles a ResourceRecord object
@@ -99,7 +110,45 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ResourceRecordReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &dnsv1alpha1.ResourceRecord{}, ownerField, func(rawObj client.Object) []string {
+		rr := rawObj.(*dnsv1alpha1.ResourceRecord)
+		if rr.Spec.OwnerRef == "" {
+			return nil
+		}
+		return []string{rr.Spec.OwnerRef}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dnsv1alpha1.ResourceRecord{}).
+		Watches(
+			&source.Kind{Type: &dnsv1alpha1.Owner{}},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForOwner),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *ResourceRecordReconciler) findObjectsForOwner(owner client.Object) []reconcile.Request {
+	attachedResourceRecords := &dnsv1alpha1.ResourceRecordList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(ownerField, owner.GetName()),
+		Namespace:     owner.GetNamespace(),
+	}
+	err := r.List(context.TODO(), attachedResourceRecords, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedResourceRecords.Items))
+	for i, item := range attachedResourceRecords.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
 }
