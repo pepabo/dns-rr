@@ -128,7 +128,7 @@ func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName s
 }
 
 func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[string]endpoint) []types.Change {
-	var changes []types.Change
+	changes := make([]types.Change, 0)
 
 	for _, owner := range owners {
 		// build changes
