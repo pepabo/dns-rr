@@ -26,22 +26,34 @@ type Route53Provider struct {
 }
 
 type endpoint struct {
-        // The Dns Name
-        dnsName string
-        // The type of DNS Record
-        class string
+	// The Dns Name
+	dnsName string
+	// The type of DNS Record
+	class string
 
-        // The value of DNS Record
-        rdata string
+	// The value of DNS Record
+	rdata string
 
-        // The TTL of DNS Record
-        ttl int64
+	// The TTL of DNS Record
+	ttl int64
 
-        // The Id of DNS Record
-        id string
+	// The Id of DNS Record
+	id string
 
-        // The owner of DNS Record
-        resourceOwner string
+	// The owner of DNS Record
+	resourceOwner string
+
+	// The flag of Alias Record
+	isAlias bool
+
+	// The alias target of DNS Record
+	aliasTarget aliasOpts
+}
+
+type aliasOpts struct {
+	dnsName                   string
+	hostedZoneId              string
+	evaluateAliasTargetHealth bool
 }
 
 func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client) (*Route53Provider, error) {
@@ -75,125 +87,169 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 }
 
 func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName string, owners []string, rrSpec dnsv1alpha1.ResourceRecordSpec) error {
-        desired := endpoint{
-                class: rrSpec.Class,
-                rdata: rrSpec.Rdata,
-                ttl: int64(rrSpec.Ttl),
-        }
-        currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class)
-        if err != nil {
-                return err
-        }
-        changes := diff(owners, zoneName, desired, currentRecords)
+	// build desired endpoint
+	desired := endpoint{
+		class: rrSpec.Class,
+		ttl:   int64(rrSpec.Ttl),
+	}
+	if rrSpec.IsAlias {
+		desired.isAlias = true
+		desired.aliasTarget = aliasOpts{
+			dnsName:                   rrSpec.AliasTarget.Record,
+			hostedZoneId:              rrSpec.AliasTarget.HostedZoneID,
+			evaluateAliasTargetHealth: rrSpec.AliasTarget.EvaluateTargetHealth,
+		}
+	} else {
+		desired.rdata = rrSpec.Rdata
+	}
 
-        // 更新
-        if 0<len(changes) {
-                changeRrsInput := route53.ChangeResourceRecordSetsInput{
-                        HostedZoneId: &zoneId,
-                        ChangeBatch: &types.ChangeBatch{
-                                Changes: changes,
-                        },
-                }
-                if _, err := p.client.ChangeResourceRecordSets(ctx, &changeRrsInput); err != nil {
-                        return errors.Wrapf(err, "failes to change resource records set for zone %s", zoneId)
-                }
-        }
+	// get actual endpoints
+	currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class)
+	if err != nil {
+		return err
+	}
 
+	// evalute differences
+	changes := diff(owners, zoneName, desired, currentRecords)
+
+	// converge
+	if 0 < len(changes) {
+		changeRrsInput := route53.ChangeResourceRecordSetsInput{
+			HostedZoneId: &zoneId,
+			ChangeBatch: &types.ChangeBatch{
+				Changes: changes,
+			},
+		}
+		if _, err := p.client.ChangeResourceRecordSets(ctx, &changeRrsInput); err != nil {
+			return errors.Wrapf(err, "failes to change resource records set for zone %s", zoneId)
+		}
+	}
 	return nil
 }
 
 func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[string]endpoint) []types.Change {
-        var changes []types.Change
+	var changes []types.Change
 
-        for _, owner := range owners {
-                fqdn := buildFQDN(owner, zoneName) 
-                desiredEp.dnsName = fqdn
-                c := types.Change{
-                        ResourceRecordSet: &types.ResourceRecordSet{
-                                Name: aws.String(fqdn),
-                                Type: types.RRType(desiredEp.class),
-                                ResourceRecords: []types.ResourceRecord{{Value: &desiredEp.rdata}},
-                                TTL: &desiredEp.ttl,
-                        },
-                }
-                if _, exist := actualEps[owner]; !exist {
-                        // レコードが存在しなかった場合
-                        c.Action = types.ChangeActionCreate
-                        changes = append(changes, c)
-                } else if desiredEp != actualEps[owner] {
-                        // 値が異なる場合
-                        c.Action = types.ChangeActionUpsert
-                        changes = append(changes, c)
-                }
-        }
-        return changes
+	for _, owner := range owners {
+		// build changes
+		fqdn := buildFQDN(owner, zoneName)
+		desiredEp.dnsName = fqdn
+		var c types.Change
+		if desiredEp.isAlias {
+			c = types.Change{
+				ResourceRecordSet: &types.ResourceRecordSet{
+					Name: aws.String(fqdn),
+					Type: types.RRType(desiredEp.class),
+					AliasTarget: &types.AliasTarget{
+						DNSName:              &desiredEp.aliasTarget.dnsName,
+						HostedZoneId:         &desiredEp.aliasTarget.hostedZoneId,
+						EvaluateTargetHealth: desiredEp.aliasTarget.evaluateAliasTargetHealth,
+					},
+				},
+			}
+		} else {
+			c = types.Change{
+				ResourceRecordSet: &types.ResourceRecordSet{
+					Name:            aws.String(fqdn),
+					Type:            types.RRType(desiredEp.class),
+					TTL:             &desiredEp.ttl,
+					ResourceRecords: []types.ResourceRecord{{Value: &desiredEp.rdata}},
+				},
+			}
+		}
+
+		// evaluate difference
+		if _, exist := actualEps[owner]; !exist {
+			// レコードが存在しなかった場合
+			c.Action = types.ChangeActionCreate
+			changes = append(changes, c)
+		} else if desiredEp != actualEps[owner] {
+			// 値が異なる場合
+			c.Action = types.ChangeActionUpsert
+			changes = append(changes, c)
+		}
+		// TODO: delete record when delete record definition
+	}
+	return changes
 }
 
 func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string) (map[string]endpoint, error) {
-        endpoints := make(map[string]endpoint, len(owners))
-        for _, owner := range owners{
-                fqdn := buildFQDN(owner, zoneName)
-                // oenwer から始まるrecordsetをリスト
-                params := &route53.ListResourceRecordSetsInput{
-                        HostedZoneId: &zoneId,
-                        StartRecordName: aws.String(fqdn),
-                }
-                output, err := p.client.ListResourceRecordSets(ctx, params)
-                if err != nil {
-                        return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", zoneId)
-                }
+	endpoints := make(map[string]endpoint, len(owners))
+	for _, owner := range owners {
+		fqdn := buildFQDN(owner, zoneName)
+		// owner から始まるrecordsetをリスト
+		params := &route53.ListResourceRecordSetsInput{
+			HostedZoneId:    &zoneId,
+			StartRecordName: aws.String(fqdn),
+		}
+		output, err := p.client.ListResourceRecordSets(ctx, params)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", zoneId)
+		}
 
-                // 一致するレコードを検索
-                ep := endpoint{
-                        dnsName: fqdn,
-                        class: recordType,
-                }
-                for _, r := range output.ResourceRecordSets {
-                        if *r.Name == fqdn {
-                                if r.Type == types.RRType(recordType) {
-                                        // TODO: multi value レコードを考慮する
-                                        ep.rdata = *r.ResourceRecords[0].Value
-                                        ep.ttl = *r.TTL
-                                        if r.SetIdentifier != nil {
-                                                ep.id = *r.SetIdentifier
-                                        }
-                                        // TODO: owner idの考慮
-                                        endpoints[owner] = ep
-                                }
-                        } else {
-                                break
-                        }
-                }
-        }
-        return endpoints, nil
+		// 一致するレコードを検索
+		ep := endpoint{
+			dnsName: fqdn,
+			class:   recordType,
+		}
+		for _, r := range output.ResourceRecordSets {
+			if *r.Name == fqdn {
+				if r.Type == types.RRType(recordType) {
+					// Set rdata or alias target value
+					if r.AliasTarget != nil {
+						ep.aliasTarget.dnsName = *r.AliasTarget.DNSName
+						ep.aliasTarget.hostedZoneId = *r.AliasTarget.HostedZoneId
+						ep.aliasTarget.evaluateAliasTargetHealth = *&r.AliasTarget.EvaluateTargetHealth
+					} else {
+						// TODO: multi value レコードを考慮する
+						ep.rdata = *r.ResourceRecords[0].Value
+
+						// set ttl
+						ep.ttl = *r.TTL
+					}
+
+					// set record identifier
+					if r.SetIdentifier != nil {
+						ep.id = *r.SetIdentifier
+					}
+
+					// TODO: owner idの考慮
+					endpoints[owner] = ep
+				}
+			} else {
+				break
+			}
+		}
+	}
+	return endpoints, nil
 }
 
 func buildFQDN(owner, zone string) string {
-        fqdn := fmt.Sprintf("%s.%s", owner, zone)
+	fqdn := fmt.Sprintf("%s.%s", owner, zone)
 	if !strings.HasSuffix(".", fqdn) {
 		fqdn = fqdn + "."
 	}
-        return fqdn
+	return fqdn
 }
 
 func isOwnerOfRecord(rrs types.ResourceRecordSet, ep endpoint, ownerId string) bool {
-        // validate
-        switch {
-        case *rrs.Name != ep.dnsName:
-        case rrs.Type != types.RRTypeTxt:
-        case !strings.HasPrefix(*rrs.ResourceRecords[0].Value, recordOwnerPrefix):
-        default:
-                return true
-        }
-        return false
+	// validate
+	switch {
+	case *rrs.Name != ep.dnsName:
+	case rrs.Type != types.RRTypeTxt:
+	case !strings.HasPrefix(*rrs.ResourceRecords[0].Value, recordOwnerPrefix):
+	default:
+		return true
+	}
+	return false
 }
 
 func buildOwnerRecordValue(ep endpoint, ownerId string) string {
-        value := ownerId
-        if ep.id != "" {
-                value = value + "-" + ep.id
-        }
-        return value
+	value := ownerId
+	if ep.id != "" {
+		value = value + "-" + ep.id
+	}
+	return value
 }
 
 func credFromSecretRef(ctx context.Context, p *dnsv1alpha1.Provider, c client.Client) (credentials.StaticCredentialsProvider, error) {

@@ -28,7 +28,7 @@ type ResourceRecordSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// +kubebuilder:validation:Enum=A;NS;AAAA;MX;CNAME;SRV;TXT;ALIAS
+	// +kubebuilder:validation:Enum=A;NS;AAAA;MX;CNAME;SRV;TXT
 	Class string `json:"class"`
 
 	// +kubebuilder:validation:Minimum=0
@@ -39,7 +39,25 @@ type ResourceRecordSpec struct {
 
 	ProviderRef string `json:"providerRef"`
 
+	// +optional
 	Rdata string `json:"rdata"`
+
+	// +optional
+	// +kubebuilder:default=false
+	IsAlias bool `json:"isAlias"`
+
+	// +optional
+	AliasTarget AliasTarget `json:"aliasTarget"`
+}
+
+type AliasTarget struct {
+	Record string `json:"record"`
+
+	// Only Route53
+	EvaluateTargetHealth bool `json:"evaluateTargetHealth"`
+
+	// +optional
+	HostedZoneID string `json:"hostedZoneID"`
 }
 
 // ResourceRecordStatus defines the observed state of ResourceRecord
