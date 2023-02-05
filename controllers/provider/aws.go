@@ -226,7 +226,7 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 
 func buildFQDN(owner, zone string) string {
 	fqdn := fmt.Sprintf("%s.%s", owner, zone)
-	if !strings.HasSuffix(".", fqdn) {
+	if !strings.HasSuffix(fqdn, ".") {
 		fqdn = fqdn + "."
 	}
 	return fqdn
