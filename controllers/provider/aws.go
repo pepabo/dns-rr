@@ -22,7 +22,7 @@ const recordOwnerPrefix = "dns-rr-owner: "
 
 type Route53Provider struct {
 	hostedZoneId string
-	client       *route53.Client
+	client       Route53API
 }
 
 type endpoint struct {
