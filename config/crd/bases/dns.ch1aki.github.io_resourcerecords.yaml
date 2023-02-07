@@ -35,6 +35,19 @@ spec:
           spec:
             description: ResourceRecordSpec defines the desired state of ResourceRecord
             properties:
+              aliasTarget:
+                properties:
+                  evaluateTargetHealth:
+                    description: Only Route53
+                    type: boolean
+                  hostedZoneID:
+                    type: string
+                  record:
+                    type: string
+                required:
+                - evaluateTargetHealth
+                - record
+                type: object
               class:
                 enum:
                 - A
@@ -44,8 +57,10 @@ spec:
                 - CNAME
                 - SRV
                 - TXT
-                - ALIAS
                 type: string
+              isAlias:
+                default: false
+                type: boolean
               ownerRef:
                 type: string
               providerRef:
@@ -61,7 +76,6 @@ spec:
             - class
             - ownerRef
             - providerRef
-            - rdata
             - ttl
             type: object
           status:
