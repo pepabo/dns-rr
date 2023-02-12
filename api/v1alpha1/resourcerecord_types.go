@@ -35,6 +35,11 @@ type ResourceRecordSpec struct {
 	// +kubebuilder:validation:Maximum=2147483647
 	Ttl int32 `json:"ttl"`
 
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=255
+	Weight *int64 `json:"weight"`
+
 	OwnerRef string `json:"ownerRef"`
 
 	ProviderRef string `json:"providerRef"`

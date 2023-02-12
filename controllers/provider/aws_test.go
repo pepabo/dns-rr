@@ -253,6 +253,115 @@ func TestDiff(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "no diff in weighted record",
+			args: args{
+				owners:   []string{"test"},
+				zoneName: "example.com",
+				desiredEp: endpoint{
+					dnsName: "test.example.com.",
+					class:   "A",
+					rdata:   "198.51.100.1",
+					ttl:     300,
+					weight:  aws.Int64(10),
+					id:      "weighted-record",
+				},
+				acutualEps: map[string]endpoint{
+					"test": {
+						dnsName: "test.example.com.",
+						class:   "A",
+						rdata:   "198.51.100.1",
+						ttl:     300,
+						weight:  aws.Int64(10),
+						id:      "weighted-record",
+					},
+				},
+			},
+			want: make([]types.Change, 0),
+		},
+		{
+			name: "no weighted record",
+			args: args{
+				owners:   []string{"test"},
+				zoneName: "example.com",
+				desiredEp: endpoint{
+					dnsName: "test.example.com.",
+					class:   "A",
+					rdata:   "198.51.100.1",
+					ttl:     300,
+					weight:  aws.Int64(10),
+					id:      "weighted-record",
+				},
+				acutualEps: map[string]endpoint{},
+			},
+			want: []types.Change{
+				{
+					ResourceRecordSet: &types.ResourceRecordSet{
+						Name: aws.String("test.example.com."),
+						Type: types.RRTypeA,
+						TTL:  aws.Int64(300),
+						ResourceRecords: []types.ResourceRecord{
+							{Value: aws.String("198.51.100.1")},
+						},
+						Weight:        aws.Int64(10),
+						SetIdentifier: aws.String("weighted-record"),
+					},
+					Action: types.ChangeActionCreate,
+				},
+			},
+		},
+		{
+			name: "diff in alias weighted record",
+			args: args{
+				owners:   []string{"test"},
+				zoneName: "example.com",
+				desiredEp: endpoint{
+					dnsName: "test.example.com.",
+					class:   "A",
+					ttl:     300,
+					weight:  aws.Int64(10),
+					id:      "weighted-record",
+					isAlias: true,
+					aliasTarget: aliasOpts{
+						dnsName:                   "target.example.com.",
+						hostedZoneId:              "Z0123456789ABCDEFGHIJ",
+						evaluateAliasTargetHealth: true,
+					},
+				},
+				acutualEps: map[string]endpoint{
+					"test": {
+						dnsName: "test.example.com.",
+						class:   "A",
+						ttl:     300,
+						aliasTarget: aliasOpts{
+							dnsName:                   "wrong.example.com.",
+							hostedZoneId:              "Z0987654321ZYXVUTSRQP",
+							evaluateAliasTargetHealth: false,
+						},
+						isAlias: true,
+						id:      *aws.String("weighted-record"),
+						weight:  aws.Int64(200),
+					},
+				},
+			},
+			want: []types.Change{
+				{
+					ResourceRecordSet: &types.ResourceRecordSet{
+						Name: aws.String("test.example.com."),
+						Type: types.RRTypeA,
+						TTL:  aws.Int64(300),
+						AliasTarget: &types.AliasTarget{
+							DNSName:              aws.String("target.example.com."),
+							HostedZoneId:         aws.String("Z0123456789ABCDEFGHIJ"),
+							EvaluateTargetHealth: true,
+						},
+						SetIdentifier: aws.String("weighted-record"),
+						Weight:        aws.Int64(10),
+					},
+					Action: types.ChangeActionUpsert,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -406,6 +515,7 @@ func TestRecords(t *testing.T) {
 								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.1")}},
 								TTL:             aws.Int64(300),
 								SetIdentifier:   aws.String("weighted-test"),
+								Weight:          aws.Int64(10),
 							},
 							{
 								Name:            aws.String("weighted.example.com."),
@@ -413,6 +523,7 @@ func TestRecords(t *testing.T) {
 								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.2")}},
 								TTL:             aws.Int64(300),
 								SetIdentifier:   aws.String("managed-by-other"),
+								Weight:          aws.Int64(20),
 							},
 						},
 					},
@@ -427,6 +538,7 @@ func TestRecords(t *testing.T) {
 					rdata:   "198.51.100.1",
 					ttl:     300,
 					id:      "weighted-test",
+					weight:  aws.Int64(10),
 				},
 			},
 			wantErr: false,

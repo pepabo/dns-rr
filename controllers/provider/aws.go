@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -42,6 +43,9 @@ type endpoint struct {
 
 	// The owner of DNS Record
 	resourceOwner string
+
+	// The Record weighte
+	weight *int64
 
 	// The flag of Alias Record
 	isAlias bool
@@ -158,12 +162,19 @@ func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[st
 			}
 		}
 
+		// weighted record
+		if desiredEp.weight != nil {
+			c.ResourceRecordSet.SetIdentifier = &desiredEp.id
+			c.ResourceRecordSet.Weight = desiredEp.weight
+			c.ResourceRecordSet.TTL = &desiredEp.ttl
+		}
+
 		// evaluate difference
 		if _, exist := actualEps[owner]; !exist {
 			// レコードが存在しなかった場合
 			c.Action = types.ChangeActionCreate
 			changes = append(changes, c)
-		} else if desiredEp != actualEps[owner] {
+		} else if !reflect.DeepEqual(desiredEp, actualEps[owner]) {
 			// 値が異なる場合
 			c.Action = types.ChangeActionUpsert
 			changes = append(changes, c)
@@ -215,6 +226,10 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 						} else {
 							break
 						}
+					}
+
+					if r.Weight != nil {
+						ep.weight = r.Weight
 					}
 
 					// TODO: owner idの考慮
