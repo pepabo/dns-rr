@@ -104,7 +104,7 @@ func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName s
 	}
 
 	// get actual endpoints
-	currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class)
+	currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class, rrSpec.Id)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[st
 	return changes
 }
 
-func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string) (map[string]endpoint, error) {
+func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error) {
 	endpoints := make(map[string]endpoint, len(owners))
 	for _, owner := range owners {
 		fqdn := buildFQDN(owner, zoneName)
@@ -208,9 +208,13 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 						ep.ttl = *r.TTL
 					}
 
-					// set record identifier
-					if r.SetIdentifier != nil {
-						ep.id = *r.SetIdentifier
+					// 一致するIDのレコードだけを対象にする
+					if id != nil {
+						if sid := r.SetIdentifier; sid != nil && *id == *sid {
+							ep.id = *r.SetIdentifier
+						} else {
+							break
+						}
 					}
 
 					// TODO: owner idの考慮

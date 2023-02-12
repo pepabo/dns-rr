@@ -48,6 +48,9 @@ type ResourceRecordSpec struct {
 
 	// +optional
 	AliasTarget AliasTarget `json:"aliasTarget"`
+
+	// +optional
+	Id *string `json:"id"`
 }
 
 type AliasTarget struct {

@@ -58,6 +58,8 @@ spec:
                 - SRV
                 - TXT
                 type: string
+              id:
+                type: string
               isAlias:
                 default: false
                 type: boolean

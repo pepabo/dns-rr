@@ -274,6 +274,7 @@ func TestRecords(t *testing.T) {
 		zoneName   string
 		owners     []string
 		recordType string
+		id         *string
 	}
 	tests := []struct {
 		name     string
@@ -378,13 +379,65 @@ func TestRecords(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "get weighted records",
+			args: args{
+				zoneId:     "Z0123456789ABCDEFGHIJ",
+				zoneName:   "example.com",
+				owners:     []string{"weighted"},
+				recordType: "A",
+				id:         aws.String("weighted-test"),
+			},
+			beforeDo: func() (Route53Provider, *gomock.Controller) {
+				controller := gomock.NewController(t)
+				r53api := NewMockRoute53API(controller)
+				r53api.EXPECT().ListResourceRecordSets(
+					context.TODO(),
+					&route53.ListResourceRecordSetsInput{
+						HostedZoneId:    aws.String("Z0123456789ABCDEFGHIJ"),
+						StartRecordName: aws.String("weighted.example.com."),
+					},
+				).Return(
+					&route53.ListResourceRecordSetsOutput{
+						ResourceRecordSets: []types.ResourceRecordSet{
+							{
+								Name:            aws.String("weighted.example.com."),
+								Type:            types.RRTypeA,
+								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.1")}},
+								TTL:             aws.Int64(300),
+								SetIdentifier:   aws.String("weighted-test"),
+							},
+							{
+								Name:            aws.String("weighted.example.com."),
+								Type:            types.RRTypeA,
+								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.2")}},
+								TTL:             aws.Int64(300),
+								SetIdentifier:   aws.String("managed-by-other"),
+							},
+						},
+					},
+					nil,
+				).Times(1)
+				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+			},
+			want: map[string]endpoint{
+				"weighted": {
+					dnsName: "weighted.example.com.",
+					class:   "A",
+					rdata:   "198.51.100.1",
+					ttl:     300,
+					id:      "weighted-test",
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, controller := tt.beforeDo()
 			defer controller.Finish()
-			got, err := p.records(context.TODO(), tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.recordType)
+			got, err := p.records(context.TODO(), tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.recordType, tt.args.id)
 			opts := cmp.AllowUnexported(endpoint{}, aliasOpts{})
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("differs: (-got +want)\n%s", diff)
