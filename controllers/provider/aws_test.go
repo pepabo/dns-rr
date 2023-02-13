@@ -318,7 +318,6 @@ func TestDiff(t *testing.T) {
 				desiredEp: endpoint{
 					dnsName: "test.example.com.",
 					class:   "A",
-					ttl:     300,
 					weight:  aws.Int64(10),
 					id:      "weighted-record",
 					isAlias: true,
@@ -332,7 +331,6 @@ func TestDiff(t *testing.T) {
 					"test": {
 						dnsName: "test.example.com.",
 						class:   "A",
-						ttl:     300,
 						aliasTarget: aliasOpts{
 							dnsName:                   "wrong.example.com.",
 							hostedZoneId:              "Z0987654321ZYXVUTSRQP",
@@ -349,7 +347,6 @@ func TestDiff(t *testing.T) {
 					ResourceRecordSet: &types.ResourceRecordSet{
 						Name: aws.String("test.example.com."),
 						Type: types.RRTypeA,
-						TTL:  aws.Int64(300),
 						AliasTarget: &types.AliasTarget{
 							DNSName:              aws.String("target.example.com."),
 							HostedZoneId:         aws.String("Z0123456789ABCDEFGHIJ"),
