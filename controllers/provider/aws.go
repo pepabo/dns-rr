@@ -107,6 +107,13 @@ func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName s
 		desired.rdata = rrSpec.Rdata
 	}
 
+	if rrSpec.Weight != nil {
+		desired.weight = rrSpec.Weight
+	}
+	if rrSpec.Id != nil {
+		desired.id = *rrSpec.Id
+	}
+
 	// get actual endpoints
 	currentRecords, err := p.records(ctx, zoneId, zoneName, owners, rrSpec.Class, rrSpec.Id)
 	if err != nil {
@@ -166,7 +173,6 @@ func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[st
 		if desiredEp.weight != nil {
 			c.ResourceRecordSet.SetIdentifier = &desiredEp.id
 			c.ResourceRecordSet.Weight = desiredEp.weight
-			c.ResourceRecordSet.TTL = &desiredEp.ttl
 		}
 
 		// evaluate difference
