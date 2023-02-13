@@ -25,7 +25,7 @@ import (
 
 // ProviderSpec defines the desired state of Provider
 type ProviderSpec struct {
-        Route53 Route53Provider `json:"route53,omitempty"`
+	Route53 Route53Provider `json:"route53,omitempty"`
 }
 
 // ProviderStatus defines the observed state of Provider
