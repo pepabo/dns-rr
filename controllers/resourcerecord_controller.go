@@ -104,9 +104,9 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// converge
 	err = client.Converge(ctx, p.Spec.Route53.HostedZoneID, p.Spec.Route53.HostedZoneName, owner.Spec.Names, rr.Spec)
-        if err != nil {
-                logger.Error(err, "failed converge")
-        }
+	if err != nil {
+		logger.Error(err, "failed converge")
+	}
 
 	return ctrl.Result{}, nil
 }
