@@ -56,6 +56,10 @@ type ResourceRecordSpec struct {
 
 	// +optional
 	Id *string `json:"id"`
+
+	// +optional
+	// +kubebuilder:default=false
+	DryRun bool `json:"dryRun"`
 }
 
 type AliasTarget struct {
@@ -77,6 +81,7 @@ type ResourceRecordStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
+// +kubebuilder:printcolumn:name="Dry Run",type="boolean",JSONPath=".spec.dryRun",priority=10
 // ResourceRecord is the Schema for the resourcerecords API
 type ResourceRecord struct {
 	metav1.TypeMeta   `json:",inline"`

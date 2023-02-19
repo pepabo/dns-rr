@@ -24,6 +24,8 @@ const recordOwnerPrefix = "dns-rr-owner: "
 type Route53Provider struct {
 	hostedZoneId string
 	client       Route53API
+	diff         func(owners []string, zoneName string, desiredEp endpoint, actualEps map[string]endpoint) []types.Change
+	recordsFx    func(ctx context.Context, client Route53API, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error)
 }
 
 type endpoint struct {
@@ -87,6 +89,8 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 	return &Route53Provider{
 		hostedZoneId: provider.Spec.Route53.HostedZoneID,
 		client:       route53.NewFromConfig(cfg),
+		diff:         diff,
+		recordsFx:    records,
 	}, nil
 }
 
@@ -121,10 +125,10 @@ func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName s
 	}
 
 	// evalute differences
-	changes := diff(owners, zoneName, desired, currentRecords)
+	changes := p.diff(owners, zoneName, desired, currentRecords)
 
 	// converge
-	if 0 < len(changes) {
+	if 0 < len(changes) && rrSpec.DryRun == false {
 		changeRrsInput := route53.ChangeResourceRecordSetsInput{
 			HostedZoneId: &zoneId,
 			ChangeBatch: &types.ChangeBatch{
@@ -190,7 +194,11 @@ func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[st
 	return changes
 }
 
-func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error) {
+func (p Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error) {
+	return p.recordsFx(ctx, p.client, zoneId, zoneName, owners, recordType, id)
+}
+
+func records(ctx context.Context, client Route53API, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error) {
 	endpoints := make(map[string]endpoint, len(owners))
 	for _, owner := range owners {
 		fqdn := buildFQDN(owner, zoneName)
@@ -199,7 +207,7 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 			HostedZoneId:    &zoneId,
 			StartRecordName: aws.String(fqdn),
 		}
-		output, err := p.client.ListResourceRecordSets(ctx, params)
+		output, err := client.ListResourceRecordSets(ctx, params)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", zoneId)
 		}
