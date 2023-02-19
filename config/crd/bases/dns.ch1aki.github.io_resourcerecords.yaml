@@ -15,7 +15,12 @@ spec:
     singular: resourcerecord
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.dryRun
+      name: Dry Run
+      priority: 10
+      type: boolean
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ResourceRecord is the Schema for the resourcerecords API
@@ -58,6 +63,9 @@ spec:
                 - SRV
                 - TXT
                 type: string
+              dryRun:
+                default: false
+                type: boolean
               id:
                 type: string
               isAlias:

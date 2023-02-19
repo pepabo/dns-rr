@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
+	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
@@ -551,6 +552,105 @@ func TestRecords(t *testing.T) {
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("differs: (-got +want)\n%s", diff)
 			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Ensure() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestConverge(t *testing.T) {
+	type args struct {
+		zoneId   string
+		zoneName string
+		owners   []string
+		rrSpec   dnsv1alpha1.ResourceRecordSpec
+	}
+	tests := []struct {
+		name          string
+		args          args
+		beforeDo      func() (Route53API, *gomock.Controller)
+		recordsResult map[string]endpoint
+		diffResult    []types.Change
+		wantErr       bool
+	}{
+		{
+			name: "execute",
+			args: args{
+				zoneId:   "Z0123456789ABCDEFGHIJ",
+				zoneName: "example.com",
+				owners:   []string{"test"},
+				rrSpec:   dnsv1alpha1.ResourceRecordSpec{DryRun: false},
+			},
+			beforeDo: func() (Route53API, *gomock.Controller) {
+				controller := gomock.NewController(t)
+				r53api := NewMockRoute53API(controller)
+				r53api.EXPECT().ChangeResourceRecordSets(
+					context.TODO(),
+					&route53.ChangeResourceRecordSetsInput{
+						HostedZoneId: aws.String("Z0123456789ABCDEFGHIJ"),
+						ChangeBatch: &types.ChangeBatch{
+							Changes: make([]types.Change, 1),
+						},
+					},
+				).Return(
+					&route53.ChangeResourceRecordSetsOutput{},
+					nil,
+				).Times(1)
+				return r53api, controller
+			},
+			diffResult: make([]types.Change, 1),
+			wantErr:    false,
+		},
+		{
+			name: "dry-run",
+			args: args{
+				zoneId:   "Z0123456789ABCDEFGHIJ",
+				zoneName: "example.com",
+				owners:   []string{"test"},
+				rrSpec:   dnsv1alpha1.ResourceRecordSpec{DryRun: true},
+			},
+			beforeDo: func() (Route53API, *gomock.Controller) {
+				controller := gomock.NewController(t)
+				r53api := NewMockRoute53API(controller)
+				return r53api, controller
+			},
+			diffResult: make([]types.Change, 1),
+			wantErr:    false,
+		},
+		{
+			name: "no diff",
+			args: args{
+				zoneId:   "Z0123456789ABCDEFGHIJ",
+				zoneName: "example.com",
+				owners:   []string{"test"},
+				rrSpec:   dnsv1alpha1.ResourceRecordSpec{DryRun: false},
+			},
+			beforeDo: func() (Route53API, *gomock.Controller) {
+				controller := gomock.NewController(t)
+				r53api := NewMockRoute53API(controller)
+				return r53api, controller
+			},
+			diffResult: make([]types.Change, 0),
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, controller := tt.beforeDo()
+			defer controller.Finish()
+			p := Route53Provider{
+				client: c,
+				diff: func(owners []string, zoneName string, desiredEp endpoint, actualEps map[string]endpoint) []types.Change {
+					return tt.diffResult
+				},
+				recordsFx: func(ctx context.Context, client Route53API, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error) {
+					return tt.recordsResult, nil
+				},
+			}
+			err := p.Converge(context.TODO(), tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.rrSpec)
+			//opts := cmp.AllowUnexported(endpoint{}, aliasOpts{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Ensure() error = %v, wantErr %v", err, tt.wantErr)
 			}
