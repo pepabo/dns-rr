@@ -385,7 +385,7 @@ func TestRecords(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     args
-		beforeDo func() (Route53Provider, *gomock.Controller)
+		beforeDo func() (Route53API, *gomock.Controller)
 		want     map[string]endpoint
 		wantErr  bool
 	}{
@@ -397,7 +397,7 @@ func TestRecords(t *testing.T) {
 				owners:     []string{"test"},
 				recordType: "A",
 			},
-			beforeDo: func() (Route53Provider, *gomock.Controller) {
+			beforeDo: func() (Route53API, *gomock.Controller) {
 				controller := gomock.NewController(t)
 				r53api := NewMockRoute53API(controller)
 				r53api.EXPECT().ListResourceRecordSets(
@@ -425,7 +425,7 @@ func TestRecords(t *testing.T) {
 					},
 					nil,
 				).Times(1)
-				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+				return r53api, controller
 			},
 			want: map[string]endpoint{
 				"test": {
@@ -445,7 +445,7 @@ func TestRecords(t *testing.T) {
 				owners:     []string{"alias"},
 				recordType: "A",
 			},
-			beforeDo: func() (Route53Provider, *gomock.Controller) {
+			beforeDo: func() (Route53API, *gomock.Controller) {
 				controller := gomock.NewController(t)
 				r53api := NewMockRoute53API(controller)
 				r53api.EXPECT().ListResourceRecordSets(
@@ -470,7 +470,7 @@ func TestRecords(t *testing.T) {
 					},
 					nil,
 				).Times(1)
-				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+				return r53api, controller
 			},
 			want: map[string]endpoint{
 				"alias": {
@@ -494,7 +494,7 @@ func TestRecords(t *testing.T) {
 				recordType: "A",
 				id:         aws.String("weighted-test"),
 			},
-			beforeDo: func() (Route53Provider, *gomock.Controller) {
+			beforeDo: func() (Route53API, *gomock.Controller) {
 				controller := gomock.NewController(t)
 				r53api := NewMockRoute53API(controller)
 				r53api.EXPECT().ListResourceRecordSets(
@@ -526,7 +526,7 @@ func TestRecords(t *testing.T) {
 					},
 					nil,
 				).Times(1)
-				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+				return r53api, controller
 			},
 			want: map[string]endpoint{
 				"weighted": {
@@ -544,9 +544,9 @@ func TestRecords(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, controller := tt.beforeDo()
+			client, controller := tt.beforeDo()
 			defer controller.Finish()
-			got, err := p.records(context.TODO(), tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.recordType, tt.args.id)
+			got, err := records(context.TODO(), client, tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.recordType, tt.args.id)
 			opts := cmp.AllowUnexported(endpoint{}, aliasOpts{})
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("differs: (-got +want)\n%s", diff)
