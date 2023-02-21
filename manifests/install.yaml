@@ -225,6 +225,7 @@ spec:
                 - TXT
                 type: string
               id:
+                nullable: true
                 type: string
               isAlias:
                 default: false
@@ -244,6 +245,7 @@ spec:
                 format: int64
                 maximum: 255
                 minimum: 0
+                nullable: true
                 type: integer
             required:
             - class

@@ -36,26 +36,28 @@ type ResourceRecordSpec struct {
 	Ttl int32 `json:"ttl"`
 
 	// +optional
+	// +nullable
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=255
-	Weight *int64 `json:"weight"`
+	Weight *int64 `json:"weight,omitempty"`
 
 	OwnerRef string `json:"ownerRef"`
 
 	ProviderRef string `json:"providerRef"`
 
 	// +optional
-	Rdata string `json:"rdata"`
+	Rdata string `json:"rdata,omitempty"`
 
 	// +optional
 	// +kubebuilder:default=false
-	IsAlias bool `json:"isAlias"`
+	IsAlias bool `json:"isAlias,omitempty"`
 
 	// +optional
-	AliasTarget AliasTarget `json:"aliasTarget"`
+	AliasTarget AliasTarget `json:"aliasTarget,omitempty"`
 
 	// +optional
-	Id *string `json:"id"`
+	// +nullable
+	Id *string `json:"id,omitempty"`
 }
 
 type AliasTarget struct {
@@ -65,7 +67,7 @@ type AliasTarget struct {
 	EvaluateTargetHealth bool `json:"evaluateTargetHealth"`
 
 	// +optional
-	HostedZoneID string `json:"hostedZoneID"`
+	HostedZoneID string `json:"hostedZoneID,omitempty"`
 }
 
 // ResourceRecordStatus defines the observed state of ResourceRecord
