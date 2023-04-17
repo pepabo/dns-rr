@@ -46,6 +46,11 @@ type Provider struct {
 	Status ProviderStatus `json:"status,omitempty"`
 }
 
+func (p *Provider) CreateCacheData() error {
+	// TODO: implement get all records
+	return nil
+}
+
 //+kubebuilder:object:root=true
 
 // ProviderList contains a list of Provider

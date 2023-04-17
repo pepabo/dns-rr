@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/ch1aki/dns-rr/controllers/endpoint"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
@@ -46,8 +47,8 @@ func TestDiff(t *testing.T) {
 	type args struct {
 		owners     []string
 		zoneName   string
-		desiredEp  endpoint
-		acutualEps map[string]endpoint
+		desiredEp  endpoint.Endpoint
+		acutualEps map[string]endpoint.Endpoint
 	}
 	tests := []struct {
 		name string
@@ -59,18 +60,18 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					rdata:   "192.0.2.1",
-					ttl:     300,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Rdata:   "192.0.2.1",
+					Ttl:     300,
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						rdata:   "192.0.2.1",
-						ttl:     300,
+						DnsName: "test.example.com.",
+						Class:   "A",
+						Rdata:   "192.0.2.1",
+						Ttl:     300,
 					},
 				},
 			},
@@ -81,13 +82,13 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					rdata:   "192.0.2.1",
-					ttl:     300,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Rdata:   "192.0.2.1",
+					Ttl:     300,
 				},
-				acutualEps: map[string]endpoint{},
+				acutualEps: map[string]endpoint.Endpoint{},
 			},
 			want: []types.Change{
 				{
@@ -108,18 +109,18 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					rdata:   "192.0.2.1",
-					ttl:     300,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Rdata:   "192.0.2.1",
+					Ttl:     300,
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						rdata:   "198.51.100.1",
-						ttl:     300,
+						DnsName: "test.example.com.",
+						Class:   "A",
+						Rdata:   "198.51.100.1",
+						Ttl:     300,
 					},
 				},
 			},
@@ -142,26 +143,26 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					aliasTarget: aliasOpts{
-						dnsName:                   "target.example.com.",
-						hostedZoneId:              "Z0123456789ABCDEFGHIJ",
-						evaluateAliasTargetHealth: true,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					AliasTarget: endpoint.AliasOpts{
+						DnsName:                   "target.example.com.",
+						HostedZoneId:              "Z0123456789ABCDEFGHIJ",
+						EvaluateAliasTargetHealth: true,
 					},
-					isAlias: true,
+					IsAlias: true,
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						aliasTarget: aliasOpts{
-							dnsName:                   "wrong.example.com.",
-							hostedZoneId:              "Z0987654321ZYXVUTSRQP",
-							evaluateAliasTargetHealth: false,
+						DnsName: "test.example.com.",
+						Class:   "A",
+						AliasTarget: endpoint.AliasOpts{
+							DnsName:                   "wrong.example.com.",
+							HostedZoneId:              "Z0987654321ZYXVUTSRQP",
+							EvaluateAliasTargetHealth: false,
 						},
-						isAlias: true,
+						IsAlias: true,
 					},
 				},
 			},
@@ -185,22 +186,22 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					aliasTarget: aliasOpts{
-						dnsName:                   "target.example.com.",
-						hostedZoneId:              "Z0123456789ABCDEFGHIJ",
-						evaluateAliasTargetHealth: true,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					AliasTarget: endpoint.AliasOpts{
+						DnsName:                   "target.example.com.",
+						HostedZoneId:              "Z0123456789ABCDEFGHIJ",
+						EvaluateAliasTargetHealth: true,
 					},
-					isAlias: true,
+					IsAlias: true,
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						rdata:   "198.51.100.1",
-						ttl:     300,
+						DnsName: "test.example.com.",
+						Class:   "A",
+						Rdata:   "198.51.100.1",
+						Ttl:     300,
 					},
 				},
 			},
@@ -224,18 +225,18 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "TXT",
-					rdata:   "test",
-					ttl:     300,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "TXT",
+					Rdata:   "test",
+					Ttl:     300,
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						rdata:   "198.51.100.1",
-						ttl:     300,
+						DnsName: "test.example.com.",
+						Class:   "A",
+						Rdata:   "198.51.100.1",
+						Ttl:     300,
 					},
 				},
 			},
@@ -258,22 +259,22 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					rdata:   "198.51.100.1",
-					ttl:     300,
-					weight:  aws.Int64(10),
-					id:      "weighted-record",
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Rdata:   "198.51.100.1",
+					Ttl:     300,
+					Weight:  aws.Int64(10),
+					Id:      "weighted-record",
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						rdata:   "198.51.100.1",
-						ttl:     300,
-						weight:  aws.Int64(10),
-						id:      "weighted-record",
+						DnsName: "test.example.com.",
+						Class:   "A",
+						Rdata:   "198.51.100.1",
+						Ttl:     300,
+						Weight:  aws.Int64(10),
+						Id:      "weighted-record",
 					},
 				},
 			},
@@ -284,15 +285,15 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					rdata:   "198.51.100.1",
-					ttl:     300,
-					weight:  aws.Int64(10),
-					id:      "weighted-record",
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Rdata:   "198.51.100.1",
+					Ttl:     300,
+					Weight:  aws.Int64(10),
+					Id:      "weighted-record",
 				},
-				acutualEps: map[string]endpoint{},
+				acutualEps: map[string]endpoint.Endpoint{},
 			},
 			want: []types.Change{
 				{
@@ -315,30 +316,30 @@ func TestDiff(t *testing.T) {
 			args: args{
 				owners:   []string{"test"},
 				zoneName: "example.com",
-				desiredEp: endpoint{
-					dnsName: "test.example.com.",
-					class:   "A",
-					weight:  aws.Int64(10),
-					id:      "weighted-record",
-					isAlias: true,
-					aliasTarget: aliasOpts{
-						dnsName:                   "target.example.com.",
-						hostedZoneId:              "Z0123456789ABCDEFGHIJ",
-						evaluateAliasTargetHealth: true,
+				desiredEp: endpoint.Endpoint{
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Weight:  aws.Int64(10),
+					Id:      "weighted-record",
+					IsAlias: true,
+					AliasTarget: endpoint.AliasOpts{
+						DnsName:                   "target.example.com.",
+						HostedZoneId:              "Z0123456789ABCDEFGHIJ",
+						EvaluateAliasTargetHealth: true,
 					},
 				},
-				acutualEps: map[string]endpoint{
+				acutualEps: map[string]endpoint.Endpoint{
 					"test": {
-						dnsName: "test.example.com.",
-						class:   "A",
-						aliasTarget: aliasOpts{
-							dnsName:                   "wrong.example.com.",
-							hostedZoneId:              "Z0987654321ZYXVUTSRQP",
-							evaluateAliasTargetHealth: false,
+						DnsName: "test.example.com.",
+						Class:   "A",
+						AliasTarget: endpoint.AliasOpts{
+							DnsName:                   "wrong.example.com.",
+							HostedZoneId:              "Z0987654321ZYXVUTSRQP",
+							EvaluateAliasTargetHealth: false,
 						},
-						isAlias: true,
-						id:      *aws.String("weighted-record"),
-						weight:  aws.Int64(200),
+						IsAlias: true,
+						Id:      *aws.String("weighted-record"),
+						Weight:  aws.Int64(200),
 					},
 				},
 			},
@@ -386,7 +387,7 @@ func TestRecords(t *testing.T) {
 		name     string
 		args     args
 		beforeDo func() (Route53Provider, *gomock.Controller)
-		want     map[string]endpoint
+		want     map[string]endpoint.Endpoint
 		wantErr  bool
 	}{
 		{
@@ -427,12 +428,12 @@ func TestRecords(t *testing.T) {
 				).Times(1)
 				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
 			},
-			want: map[string]endpoint{
+			want: map[string]endpoint.Endpoint{
 				"test": {
-					dnsName: "test.example.com.",
-					class:   "A",
-					rdata:   "198.51.100.1",
-					ttl:     300,
+					DnsName: "test.example.com.",
+					Class:   "A",
+					Rdata:   "198.51.100.1",
+					Ttl:     300,
 				},
 			},
 			wantErr: false,
@@ -472,14 +473,14 @@ func TestRecords(t *testing.T) {
 				).Times(1)
 				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
 			},
-			want: map[string]endpoint{
+			want: map[string]endpoint.Endpoint{
 				"alias": {
-					dnsName: "alias.example.com.",
-					class:   "A",
-					aliasTarget: aliasOpts{
-						dnsName:                   "test.example.com.",
-						hostedZoneId:              "Z0123456789ABCDEFGHIJ",
-						evaluateAliasTargetHealth: true,
+					DnsName: "alias.example.com.",
+					Class:   "A",
+					AliasTarget: endpoint.AliasOpts{
+						DnsName:                   "test.example.com.",
+						HostedZoneId:              "Z0123456789ABCDEFGHIJ",
+						EvaluateAliasTargetHealth: true,
 					},
 				},
 			},
@@ -528,14 +529,14 @@ func TestRecords(t *testing.T) {
 				).Times(1)
 				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
 			},
-			want: map[string]endpoint{
+			want: map[string]endpoint.Endpoint{
 				"weighted": {
-					dnsName: "weighted.example.com.",
-					class:   "A",
-					rdata:   "198.51.100.1",
-					ttl:     300,
-					id:      "weighted-test",
-					weight:  aws.Int64(10),
+					DnsName: "weighted.example.com.",
+					Class:   "A",
+					Rdata:   "198.51.100.1",
+					Ttl:     300,
+					Id:      "weighted-test",
+					Weight:  aws.Int64(10),
 				},
 			},
 			wantErr: false,
@@ -547,7 +548,7 @@ func TestRecords(t *testing.T) {
 			p, controller := tt.beforeDo()
 			defer controller.Finish()
 			got, err := p.records(context.TODO(), tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.recordType, tt.args.id)
-			opts := cmp.AllowUnexported(endpoint{}, aliasOpts{})
+			opts := cmp.AllowUnexported(endpoint.AliasOpts{}, endpoint.AliasOpts{})
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("differs: (-got +want)\n%s", diff)
 			}

@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,11 @@ type ProviderReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+var (
+	cacheLock sync.RWMutex
+	cache     map[string]interface{}
+)
 
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=providers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=providers/status,verbs=get;update;patch
