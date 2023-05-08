@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
+	ep "github.com/ch1aki/dns-rr/controllers/endpoint"
 )
 
 // ProviderReconciler reconciles a Provider object
@@ -35,9 +37,13 @@ type ProviderReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+const (
+	providerCacheUpdateIntervalMinute = 5
+)
+
 var (
-	cacheLock sync.RWMutex
-	cache     map[string]interface{}
+	providerZoneCacheLock sync.RWMutex
+	providerZoneCache     map[string]map[string][]ep.Endpoint
 )
 
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=providers,verbs=get;list;watch;create;update;patch;delete
@@ -78,7 +84,47 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Start cache update gorutine
+	go r.updateCacheInBackground(context.Background(), providerCacheUpdateIntervalMinute*time.Minute)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dnsv1alpha1.Provider{}).
 		Complete(r)
+}
+
+func (r *ProviderReconciler) updateCacheInBackground(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	logger := log.FromContext(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := r.updateCache(ctx); err != nil {
+				logger.Error(err, "failed to update cache in background")
+			}
+		}
+	}
+}
+
+func (r *ProviderReconciler) updateCache(ctx context.Context) error {
+	// Get custom resources
+	providerList := &dnsv1alpha1.ProviderList{}
+	if err := r.List(ctx, providerList); err != nil {
+		return err
+	}
+
+	// update cache
+	providerZoneCacheLock.Lock()
+	defer providerZoneCacheLock.Unlock()
+	for _, provider := range providerList.Items {
+		cacheKey := provider.Namespace + "/" + provider.Name
+		cacheData, _ := provider.CreateCacheData()
+		providerZoneCache[cacheKey] = cacheData
+	}
+
+	return nil
 }
