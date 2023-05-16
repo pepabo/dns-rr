@@ -216,6 +216,26 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 	return endpoints, nil
 }
 
+func (p *Route53Provider) AllRecords(ctx context.Context, zoneName string) ([]types.ResourceRecordSet, error) {
+	var result []types.ResourceRecordSet
+
+	params := &route53.ListResourceRecordSetsInput{
+		HostedZoneId: &p.hostedZoneId,
+	}
+	for isTrunc := true; isTrunc; {
+		output, err := p.client.ListResourceRecordSets(ctx, params)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", p.hostedZoneId)
+		}
+		result = append(result, output.ResourceRecordSets...)
+		isTrunc = output.IsTruncated
+		params.StartRecordName, params.StartRecordType, params.StartRecordIdentifier =
+			output.NextRecordName, output.NextRecordType, output.NextRecordIdentifier
+	}
+
+	return result, nil
+}
+
 func buildFQDN(owner, zone string) string {
 	fqdn := fmt.Sprintf("%s.%s", owner, zone)
 	if !strings.HasSuffix(fqdn, ".") {

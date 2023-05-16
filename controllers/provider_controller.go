@@ -27,8 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
-	ep "github.com/ch1aki/dns-rr/controllers/endpoint"
+	provider "github.com/ch1aki/dns-rr/controllers/provider"
 )
 
 // ProviderReconciler reconciles a Provider object
@@ -43,7 +44,7 @@ const (
 
 var (
 	providerZoneCacheLock sync.RWMutex
-	providerZoneCache     map[string]map[string][]ep.Endpoint
+	providerZoneCache     map[string][]types.ResourceRecordSet
 )
 
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=providers,verbs=get;list;watch;create;update;patch;delete
@@ -111,6 +112,8 @@ func (r *ProviderReconciler) updateCacheInBackground(ctx context.Context, interv
 }
 
 func (r *ProviderReconciler) updateCache(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+
 	// Get custom resources
 	providerList := &dnsv1alpha1.ProviderList{}
 	if err := r.List(ctx, providerList); err != nil {
@@ -120,9 +123,14 @@ func (r *ProviderReconciler) updateCache(ctx context.Context) error {
 	// update cache
 	providerZoneCacheLock.Lock()
 	defer providerZoneCacheLock.Unlock()
-	for _, provider := range providerList.Items {
-		cacheKey := provider.Namespace + "/" + provider.Name
-		cacheData, _ := provider.CreateCacheData()
+	for _, p := range providerList.Items {
+		cacheKey := p.Namespace + "/" + p.Name
+		var route53 provider.Route53Provider
+		client, err := route53.NewClient(ctx, &p, r.Client, nil)
+		if err != nil {
+			logger.Error(err, "failed to initialize provider client at updateCache")
+		}
+		cacheData, _ := client.AllRecords(ctx, p.Spec.Route53.HostedZoneName)
 		providerZoneCache[cacheKey] = cacheData
 	}
 

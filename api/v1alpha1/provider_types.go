@@ -18,8 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	ep "github.com/ch1aki/dns-rr/controllers/endpoint"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -46,13 +44,6 @@ type Provider struct {
 
 	Spec   ProviderSpec   `json:"spec,omitempty"`
 	Status ProviderStatus `json:"status,omitempty"`
-}
-
-func (p *Provider) CreateCacheData() (map[string][]ep.Endpoint, error) {
-	// TODO: implement get all records
-	data := make(map[string][]ep.Endpoint, 1000)
-
-	return data, nil
 }
 
 //+kubebuilder:object:root=true
