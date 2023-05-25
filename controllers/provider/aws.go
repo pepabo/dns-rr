@@ -30,7 +30,7 @@ type Route53Provider struct {
 	providerZoneCache map[string][]types.ResourceRecordSet
 }
 
-func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client, cache *map[string]*route53.ListResourceRecordSetsOutput) (*Route53Provider, error) {
+func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client, cache *map[string][]types.ResourceRecordSet) (*Route53Provider, error) {
 	var optFns []func(*config.LoadOptions) error
 
 	// secret ref option
