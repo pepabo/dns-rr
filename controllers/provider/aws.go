@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -23,11 +25,12 @@ import (
 const recordOwnerPrefix = "dns-rr-owner: "
 
 type Route53Provider struct {
-	hostedZoneId string
-	client       Route53API
+	hostedZoneId      string
+	client            Route53API
+	providerZoneCache map[string][]types.ResourceRecordSet
 }
 
-func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client) (*Route53Provider, error) {
+func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client, cache *map[string]*route53.ListResourceRecordSetsOutput) (*Route53Provider, error) {
 	var optFns []func(*config.LoadOptions) error
 
 	// secret ref option
@@ -45,6 +48,11 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 	} else {
 		optFns = append(optFns, config.WithRegion(region))
 	}
+
+        // retry option
+        optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
+                return retry.AddWithMaxBackoffDelay(retry.NewStandard(), 60*time.Second)
+        }))
 
 	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {

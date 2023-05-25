@@ -97,7 +97,7 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// setup client
 	var route53 provider.Route53Provider
-	client, err := route53.NewClient(ctx, &p, r.Client)
+	client, err := route53.NewClient(ctx, &p, r.Client, &providerZoneCache)
 	if err != nil {
 		logger.Error(err, "failed initialize client")
 	}
