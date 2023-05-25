@@ -49,10 +49,10 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 		optFns = append(optFns, config.WithRegion(region))
 	}
 
-        // retry option
-        optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
-                return retry.AddWithMaxBackoffDelay(retry.NewStandard(), 60*time.Second)
-        }))
+	// retry option
+	optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
+		return retry.AddWithMaxBackoffDelay(retry.NewStandard(), 60*time.Second)
+	}))
 
 	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {
