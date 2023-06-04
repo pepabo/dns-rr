@@ -27,6 +27,7 @@ const recordOwnerPrefix = "dns-rr-owner: "
 type Route53Provider struct {
 	hostedZoneId      string
 	client            Route53API
+	cacheKey          string
 	providerZoneCache map[string][]types.ResourceRecordSet
 }
 
@@ -60,8 +61,10 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 	}
 
 	return &Route53Provider{
-		hostedZoneId: provider.Spec.Route53.HostedZoneID,
-		client:       route53.NewFromConfig(cfg),
+		hostedZoneId:      provider.Spec.Route53.HostedZoneID,
+		client:            route53.NewFromConfig(cfg),
+		cacheKey:          provider.Namespace + "/" + provider.Name,
+		providerZoneCache: *cache,
 	}, nil
 }
 
@@ -169,22 +172,13 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 	endpoints := make(map[string]endpoint.Endpoint, len(owners))
 	for _, owner := range owners {
 		fqdn := buildFQDN(owner, zoneName)
-		// owner から始まるrecordsetをリスト
-		params := &route53.ListResourceRecordSetsInput{
-			HostedZoneId:    &zoneId,
-			StartRecordName: aws.String(fqdn),
-		}
-		output, err := p.client.ListResourceRecordSets(ctx, params)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", zoneId)
-		}
 
-		// 一致するレコードを検索
+		// 一致するレコードをキャッシュから検索
 		ep := endpoint.Endpoint{
 			DnsName: fqdn,
 			Class:   recordType,
 		}
-		for _, r := range output.ResourceRecordSets {
+		for _, r := range p.providerZoneCache[p.cacheKey] {
 			if *r.Name == fqdn {
 				if r.Type == types.RRType(recordType) {
 					// Set rdata or alias target value

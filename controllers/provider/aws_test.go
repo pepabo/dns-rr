@@ -5,13 +5,10 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/ch1aki/dns-rr/controllers/endpoint"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-
-	gomock "github.com/golang/mock/gomock"
 )
 
 func TestBuildFQDN(t *testing.T) {
@@ -386,7 +383,7 @@ func TestRecords(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     args
-		beforeDo func() (Route53Provider, *gomock.Controller)
+		beforeDo func() Route53Provider
 		want     map[string]endpoint.Endpoint
 		wantErr  bool
 	}{
@@ -398,35 +395,24 @@ func TestRecords(t *testing.T) {
 				owners:     []string{"test"},
 				recordType: "A",
 			},
-			beforeDo: func() (Route53Provider, *gomock.Controller) {
-				controller := gomock.NewController(t)
-				r53api := NewMockRoute53API(controller)
-				r53api.EXPECT().ListResourceRecordSets(
-					context.TODO(),
-					&route53.ListResourceRecordSetsInput{
-						HostedZoneId:    aws.String("Z0123456789ABCDEFGHIJ"),
-						StartRecordName: aws.String("test.example.com."),
+			beforeDo: func() Route53Provider {
+				key := "exampleNS/example"
+				cache := map[string][]types.ResourceRecordSet{key: {
+					{
+						Name:            aws.String("test.example.com."),
+						Type:            types.RRTypeA,
+						ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.1")}},
+						TTL:             aws.Int64(300),
 					},
-				).Return(
-					&route53.ListResourceRecordSetsOutput{
-						ResourceRecordSets: []types.ResourceRecordSet{
-							{
-								Name:            aws.String("test.example.com."),
-								Type:            types.RRTypeA,
-								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.1")}},
-								TTL:             aws.Int64(300),
-							},
-							{
-								Name:            aws.String("test.example.com.example.com."),
-								Type:            types.RRTypeTxt,
-								ResourceRecords: []types.ResourceRecord{{Value: aws.String("expected ignore")}},
-								TTL:             aws.Int64(600),
-							},
-						},
+					{
+						Name:            aws.String("test.example.com.example.com."),
+						Type:            types.RRTypeTxt,
+						ResourceRecords: []types.ResourceRecord{{Value: aws.String("expected ignore")}},
+						TTL:             aws.Int64(600),
 					},
-					nil,
-				).Times(1)
-				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+				}}
+
+				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: cache}
 			},
 			want: map[string]endpoint.Endpoint{
 				"test": {
@@ -446,32 +432,21 @@ func TestRecords(t *testing.T) {
 				owners:     []string{"alias"},
 				recordType: "A",
 			},
-			beforeDo: func() (Route53Provider, *gomock.Controller) {
-				controller := gomock.NewController(t)
-				r53api := NewMockRoute53API(controller)
-				r53api.EXPECT().ListResourceRecordSets(
-					context.TODO(),
-					&route53.ListResourceRecordSetsInput{
-						HostedZoneId:    aws.String("Z0123456789ABCDEFGHIJ"),
-						StartRecordName: aws.String("alias.example.com."),
-					},
-				).Return(
-					&route53.ListResourceRecordSetsOutput{
-						ResourceRecordSets: []types.ResourceRecordSet{
-							{
-								Name: aws.String("alias.example.com."),
-								Type: types.RRTypeA,
-								AliasTarget: &types.AliasTarget{
-									DNSName:              aws.String("test.example.com."),
-									HostedZoneId:         aws.String("Z0123456789ABCDEFGHIJ"),
-									EvaluateTargetHealth: true,
-								},
-							},
+			beforeDo: func() Route53Provider {
+				key := "exampleNS/example"
+				cache := map[string][]types.ResourceRecordSet{key: {
+					{
+						Name: aws.String("alias.example.com."),
+						Type: types.RRTypeA,
+						AliasTarget: &types.AliasTarget{
+							DNSName:              aws.String("test.example.com."),
+							HostedZoneId:         aws.String("Z0123456789ABCDEFGHIJ"),
+							EvaluateTargetHealth: true,
 						},
 					},
-					nil,
-				).Times(1)
-				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+				}}
+
+				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: cache}
 			},
 			want: map[string]endpoint.Endpoint{
 				"alias": {
@@ -495,39 +470,27 @@ func TestRecords(t *testing.T) {
 				recordType: "A",
 				id:         aws.String("weighted-test"),
 			},
-			beforeDo: func() (Route53Provider, *gomock.Controller) {
-				controller := gomock.NewController(t)
-				r53api := NewMockRoute53API(controller)
-				r53api.EXPECT().ListResourceRecordSets(
-					context.TODO(),
-					&route53.ListResourceRecordSetsInput{
-						HostedZoneId:    aws.String("Z0123456789ABCDEFGHIJ"),
-						StartRecordName: aws.String("weighted.example.com."),
+			beforeDo: func() Route53Provider {
+				key := "exampleNS/example"
+				cache := map[string][]types.ResourceRecordSet{key: {
+					{
+						Name:            aws.String("weighted.example.com."),
+						Type:            types.RRTypeA,
+						ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.1")}},
+						TTL:             aws.Int64(300),
+						SetIdentifier:   aws.String("weighted-test"),
+						Weight:          aws.Int64(10),
 					},
-				).Return(
-					&route53.ListResourceRecordSetsOutput{
-						ResourceRecordSets: []types.ResourceRecordSet{
-							{
-								Name:            aws.String("weighted.example.com."),
-								Type:            types.RRTypeA,
-								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.1")}},
-								TTL:             aws.Int64(300),
-								SetIdentifier:   aws.String("weighted-test"),
-								Weight:          aws.Int64(10),
-							},
-							{
-								Name:            aws.String("weighted.example.com."),
-								Type:            types.RRTypeA,
-								ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.2")}},
-								TTL:             aws.Int64(300),
-								SetIdentifier:   aws.String("managed-by-other"),
-								Weight:          aws.Int64(20),
-							},
-						},
+					{
+						Name:            aws.String("weighted.example.com."),
+						Type:            types.RRTypeA,
+						ResourceRecords: []types.ResourceRecord{{Value: aws.String("198.51.100.2")}},
+						TTL:             aws.Int64(300),
+						SetIdentifier:   aws.String("managed-by-other"),
+						Weight:          aws.Int64(20),
 					},
-					nil,
-				).Times(1)
-				return Route53Provider{client: r53api, hostedZoneId: "Z0123456789ABCDEFGHIJ"}, controller
+				}}
+				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: cache}
 			},
 			want: map[string]endpoint.Endpoint{
 				"weighted": {
@@ -545,8 +508,7 @@ func TestRecords(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, controller := tt.beforeDo()
-			defer controller.Finish()
+			p := tt.beforeDo()
 			got, err := p.records(context.TODO(), tt.args.zoneId, tt.args.zoneName, tt.args.owners, tt.args.recordType, tt.args.id)
 			opts := cmp.AllowUnexported(endpoint.AliasOpts{}, endpoint.AliasOpts{})
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
