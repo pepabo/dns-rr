@@ -91,7 +91,7 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
-		logger.Error(err, "unable to get ResourceRecord", "name", rr.Namespace+"/"+rr.Spec.ProviderRef)
+		logger.Error(err, "unable to get Provider", "name", rr.Namespace+"/"+rr.Spec.ProviderRef)
 		return ctrl.Result{}, err
 	}
 
