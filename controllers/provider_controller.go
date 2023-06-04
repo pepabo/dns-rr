@@ -94,11 +94,18 @@ func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ProviderReconciler) updateCacheInBackground(ctx context.Context, interval time.Duration) {
+	logger := log.FromContext(ctx)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	logger := log.FromContext(ctx)
+	logger.Info("Start initialize cache")
+	providerZoneCache = make(map[string][]types.ResourceRecordSet)
+	if err := r.updateCache(ctx); err != nil {
+		logger.Error(err, "Failed to initialize cache")
+	}
+	logger.Info("Successed initialize cache!!")
 
+	logger.Info("Started cache update in background")
 	for {
 		select {
 		case <-ctx.Done():
@@ -126,12 +133,18 @@ func (r *ProviderReconciler) updateCache(ctx context.Context) error {
 	for _, p := range providerList.Items {
 		cacheKey := p.Namespace + "/" + p.Name
 		var route53 provider.Route53Provider
-		client, err := route53.NewClient(ctx, &p, r.Client, nil)
+		client, err := route53.NewClient(ctx, &p, r.Client, &providerZoneCache)
 		if err != nil {
 			logger.Error(err, "failed to initialize provider client at updateCache")
+			return err
 		}
-		cacheData, _ := client.AllRecords(ctx, p.Spec.Route53.HostedZoneName)
+		cacheData, err := client.AllRecords(ctx, p.Spec.Route53.HostedZoneName)
+		if err != nil {
+			logger.Error(err, "fialed to get AllRecords")
+			return err
+		}
 		providerZoneCache[cacheKey] = cacheData
+		logger.Info("Completed updating cache.", "cache", cacheKey)
 	}
 
 	return nil

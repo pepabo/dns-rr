@@ -28,7 +28,7 @@ type Route53Provider struct {
 	hostedZoneId      string
 	client            Route53API
 	cacheKey          string
-	providerZoneCache map[string][]types.ResourceRecordSet
+	providerZoneCache *map[string][]types.ResourceRecordSet
 }
 
 func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client, cache *map[string][]types.ResourceRecordSet) (*Route53Provider, error) {
@@ -64,7 +64,7 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 		hostedZoneId:      provider.Spec.Route53.HostedZoneID,
 		client:            route53.NewFromConfig(cfg),
 		cacheKey:          provider.Namespace + "/" + provider.Name,
-		providerZoneCache: *cache,
+		providerZoneCache: cache,
 	}, nil
 }
 
@@ -178,7 +178,7 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 			DnsName: fqdn,
 			Class:   recordType,
 		}
-		for _, r := range p.providerZoneCache[p.cacheKey] {
+		for _, r := range (*p.providerZoneCache)[p.cacheKey] {
 			if *r.Name == fqdn {
 				if r.Type == types.RRType(recordType) {
 					// Set rdata or alias target value
@@ -219,7 +219,7 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 }
 
 func (p *Route53Provider) AllRecords(ctx context.Context, zoneName string) ([]types.ResourceRecordSet, error) {
-	var result []types.ResourceRecordSet
+	result := make([]types.ResourceRecordSet, 0, 100)
 
 	params := &route53.ListResourceRecordSetsInput{
 		HostedZoneId: &p.hostedZoneId,

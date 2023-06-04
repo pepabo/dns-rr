@@ -412,7 +412,7 @@ func TestRecords(t *testing.T) {
 					},
 				}}
 
-				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: cache}
+				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: &cache}
 			},
 			want: map[string]endpoint.Endpoint{
 				"test": {
@@ -446,7 +446,7 @@ func TestRecords(t *testing.T) {
 					},
 				}}
 
-				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: cache}
+				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: &cache}
 			},
 			want: map[string]endpoint.Endpoint{
 				"alias": {
@@ -490,7 +490,7 @@ func TestRecords(t *testing.T) {
 						Weight:          aws.Int64(20),
 					},
 				}}
-				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: cache}
+				return Route53Provider{hostedZoneId: "Z0123456789ABCDEFGHIJ", cacheKey: key, providerZoneCache: &cache}
 			},
 			want: map[string]endpoint.Endpoint{
 				"weighted": {
