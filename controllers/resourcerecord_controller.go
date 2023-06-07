@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,7 +38,8 @@ import (
 )
 
 const (
-	ownerField = ".spec.ownerRef"
+	ownerField      = ".spec.ownerRef"
+	requeueInterval = 10 * time.Minute
 )
 
 // ResourceRecordReconciler reconciles a ResourceRecord object
@@ -108,7 +110,7 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		logger.Error(err, "failed converge")
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: requeueInterval}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
