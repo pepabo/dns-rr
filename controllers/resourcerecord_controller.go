@@ -102,12 +102,15 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	client, err := route53.NewClient(ctx, &p, r.Client, &providerZoneCache)
 	if err != nil {
 		logger.Error(err, "failed initialize client")
+		return ctrl.Result{}, err
 	}
 
 	// converge
+	logger.Info("start Converge", "rr", rr.Name)
 	err = client.Converge(ctx, p.Spec.Route53.HostedZoneID, p.Spec.Route53.HostedZoneName, owner.Spec.Names, rr.Spec)
 	if err != nil {
 		logger.Error(err, "failed converge")
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	return ctrl.Result{RequeueAfter: requeueInterval}, nil

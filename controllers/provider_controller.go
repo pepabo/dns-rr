@@ -95,17 +95,16 @@ func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ProviderReconciler) updateCacheInBackground(ctx context.Context, interval time.Duration) {
 	logger := log.FromContext(ctx)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 
 	logger.Info("Start initialize cache")
 	providerZoneCache = make(map[string][]types.ResourceRecordSet)
 	if err := r.updateCache(ctx); err != nil {
 		logger.Error(err, "Failed to initialize cache")
 	}
-	logger.Info("Successed initialize cache!!")
 
 	logger.Info("Started cache update in background")
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
