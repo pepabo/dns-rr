@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
+	provider "github.com/ch1aki/dns-rr/controllers/provider"
 )
 
 // ProviderReconciler reconciles a Provider object
@@ -33,6 +37,15 @@ type ProviderReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+const (
+	providerCacheUpdateIntervalMinute = 5
+)
+
+var (
+	providerZoneCacheLock sync.RWMutex
+	providerZoneCache     map[string][]types.ResourceRecordSet
+)
 
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=providers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dns.ch1aki.github.io,resources=providers/status,verbs=get;update;patch
@@ -72,7 +85,66 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Start cache update gorutine
+	go r.updateCacheInBackground(context.Background(), providerCacheUpdateIntervalMinute*time.Minute)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dnsv1alpha1.Provider{}).
 		Complete(r)
+}
+
+func (r *ProviderReconciler) updateCacheInBackground(ctx context.Context, interval time.Duration) {
+	logger := log.FromContext(ctx)
+
+	logger.Info("Start initialize cache")
+	providerZoneCache = make(map[string][]types.ResourceRecordSet)
+	if err := r.updateCache(ctx); err != nil {
+		logger.Error(err, "Failed to initialize cache")
+	}
+
+	logger.Info("Started cache update in background")
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := r.updateCache(ctx); err != nil {
+				logger.Error(err, "failed to update cache in background")
+			}
+		}
+	}
+}
+
+func (r *ProviderReconciler) updateCache(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+
+	// Get custom resources
+	providerList := &dnsv1alpha1.ProviderList{}
+	if err := r.List(ctx, providerList); err != nil {
+		return err
+	}
+
+	// update cache
+	providerZoneCacheLock.Lock()
+	defer providerZoneCacheLock.Unlock()
+	for _, p := range providerList.Items {
+		cacheKey := p.Namespace + "/" + p.Name
+		var route53 provider.Route53Provider
+		client, err := route53.NewClient(ctx, &p, r.Client, &providerZoneCache)
+		if err != nil {
+			logger.Error(err, "failed to initialize provider client at updateCache")
+			return err
+		}
+		cacheData, err := client.AllRecords(ctx, p.Spec.Route53.HostedZoneName)
+		if err != nil {
+			logger.Error(err, "fialed to get AllRecords")
+			return err
+		}
+		providerZoneCache[cacheKey] = cacheData
+		logger.Info("Completed updating cache.", "cache", cacheKey)
+	}
+
+	return nil
 }

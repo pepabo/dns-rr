@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,7 +38,8 @@ import (
 )
 
 const (
-	ownerField = ".spec.ownerRef"
+	ownerField      = ".spec.ownerRef"
+	requeueInterval = 10 * time.Minute
 )
 
 // ResourceRecordReconciler reconciles a ResourceRecord object
@@ -91,24 +93,27 @@ func (r *ResourceRecordReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
-		logger.Error(err, "unable to get ResourceRecord", "name", rr.Namespace+"/"+rr.Spec.ProviderRef)
+		logger.Error(err, "unable to get Provider", "name", rr.Namespace+"/"+rr.Spec.ProviderRef)
 		return ctrl.Result{}, err
 	}
 
 	// setup client
 	var route53 provider.Route53Provider
-	client, err := route53.NewClient(ctx, &p, r.Client)
+	client, err := route53.NewClient(ctx, &p, r.Client, &providerZoneCache)
 	if err != nil {
 		logger.Error(err, "failed initialize client")
+		return ctrl.Result{}, err
 	}
 
 	// converge
+	logger.Info("start Converge", "rr", rr.Name)
 	err = client.Converge(ctx, p.Spec.Route53.HostedZoneID, p.Spec.Route53.HostedZoneName, owner.Spec.Names, rr.Spec)
 	if err != nil {
 		logger.Error(err, "failed converge")
+		return ctrl.Result{Requeue: true}, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: requeueInterval}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

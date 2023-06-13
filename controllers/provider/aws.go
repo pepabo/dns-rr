@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -17,50 +19,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dnsv1alpha1 "github.com/ch1aki/dns-rr/api/v1alpha1"
+	"github.com/ch1aki/dns-rr/controllers/endpoint"
 )
 
 const recordOwnerPrefix = "dns-rr-owner: "
 
 type Route53Provider struct {
-	hostedZoneId string
-	client       Route53API
+	hostedZoneId      string
+	client            Route53API
+	cacheKey          string
+	providerZoneCache *map[string][]types.ResourceRecordSet
 }
 
-type endpoint struct {
-	// The Dns Name
-	dnsName string
-	// The type of DNS Record
-	class string
-
-	// The value of DNS Record
-	rdata string
-
-	// The TTL of DNS Record
-	ttl int64
-
-	// The Id of DNS Record
-	id string
-
-	// The owner of DNS Record
-	resourceOwner string
-
-	// The Record weighte
-	weight *int64
-
-	// The flag of Alias Record
-	isAlias bool
-
-	// The alias target of DNS Record
-	aliasTarget aliasOpts
-}
-
-type aliasOpts struct {
-	dnsName                   string
-	hostedZoneId              string
-	evaluateAliasTargetHealth bool
-}
-
-func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client) (*Route53Provider, error) {
+func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Provider, c client.Client, cache *map[string][]types.ResourceRecordSet) (*Route53Provider, error) {
 	var optFns []func(*config.LoadOptions) error
 
 	// secret ref option
@@ -79,39 +50,46 @@ func (r Route53Provider) NewClient(ctx context.Context, provider *dnsv1alpha1.Pr
 		optFns = append(optFns, config.WithRegion(region))
 	}
 
+	// retry option
+	optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
+		return retry.AddWithMaxBackoffDelay(retry.NewStandard(), 60*time.Second)
+	}))
+
 	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {
 		return nil, fmt.Errorf("load config error: %w", err)
 	}
 
 	return &Route53Provider{
-		hostedZoneId: provider.Spec.Route53.HostedZoneID,
-		client:       route53.NewFromConfig(cfg),
+		hostedZoneId:      provider.Spec.Route53.HostedZoneID,
+		client:            route53.NewFromConfig(cfg),
+		cacheKey:          provider.Namespace + "/" + provider.Name,
+		providerZoneCache: cache,
 	}, nil
 }
 
 func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName string, owners []string, rrSpec dnsv1alpha1.ResourceRecordSpec) error {
 	// build desired endpoint
-	desired := endpoint{
-		class: rrSpec.Class,
-		ttl:   int64(rrSpec.Ttl),
+	desired := endpoint.Endpoint{
+		Class: rrSpec.Class,
+		Ttl:   int64(rrSpec.Ttl),
 	}
 	if rrSpec.IsAlias {
-		desired.isAlias = true
-		desired.aliasTarget = aliasOpts{
-			dnsName:                   rrSpec.AliasTarget.Record,
-			hostedZoneId:              rrSpec.AliasTarget.HostedZoneID,
-			evaluateAliasTargetHealth: rrSpec.AliasTarget.EvaluateTargetHealth,
+		desired.IsAlias = true
+		desired.AliasTarget = endpoint.AliasOpts{
+			DnsName:                   rrSpec.AliasTarget.Record,
+			HostedZoneId:              rrSpec.AliasTarget.HostedZoneID,
+			EvaluateAliasTargetHealth: rrSpec.AliasTarget.EvaluateTargetHealth,
 		}
 	} else {
-		desired.rdata = rrSpec.Rdata
+		desired.Rdata = rrSpec.Rdata
 	}
 
 	if rrSpec.Weight != nil {
-		desired.weight = rrSpec.Weight
+		desired.Weight = rrSpec.Weight
 	}
 	if rrSpec.Id != nil {
-		desired.id = *rrSpec.Id
+		desired.Id = *rrSpec.Id
 	}
 
 	// get actual endpoints
@@ -138,23 +116,23 @@ func (p Route53Provider) Converge(ctx context.Context, zoneId string, zoneName s
 	return nil
 }
 
-func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[string]endpoint) []types.Change {
+func diff(owners []string, zoneName string, desiredEp endpoint.Endpoint, actualEps map[string]endpoint.Endpoint) []types.Change {
 	changes := make([]types.Change, 0)
 
 	for _, owner := range owners {
 		// build changes
 		fqdn := buildFQDN(owner, zoneName)
-		desiredEp.dnsName = fqdn
+		desiredEp.DnsName = fqdn
 		var c types.Change
-		if desiredEp.isAlias {
+		if desiredEp.IsAlias {
 			c = types.Change{
 				ResourceRecordSet: &types.ResourceRecordSet{
 					Name: aws.String(fqdn),
-					Type: types.RRType(desiredEp.class),
+					Type: types.RRType(desiredEp.Class),
 					AliasTarget: &types.AliasTarget{
-						DNSName:              &desiredEp.aliasTarget.dnsName,
-						HostedZoneId:         &desiredEp.aliasTarget.hostedZoneId,
-						EvaluateTargetHealth: desiredEp.aliasTarget.evaluateAliasTargetHealth,
+						DNSName:              &desiredEp.AliasTarget.DnsName,
+						HostedZoneId:         &desiredEp.AliasTarget.HostedZoneId,
+						EvaluateTargetHealth: desiredEp.AliasTarget.EvaluateAliasTargetHealth,
 					},
 				},
 			}
@@ -162,17 +140,17 @@ func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[st
 			c = types.Change{
 				ResourceRecordSet: &types.ResourceRecordSet{
 					Name:            aws.String(fqdn),
-					Type:            types.RRType(desiredEp.class),
-					TTL:             &desiredEp.ttl,
-					ResourceRecords: []types.ResourceRecord{{Value: &desiredEp.rdata}},
+					Type:            types.RRType(desiredEp.Class),
+					TTL:             &desiredEp.Ttl,
+					ResourceRecords: []types.ResourceRecord{{Value: &desiredEp.Rdata}},
 				},
 			}
 		}
 
 		// weighted record
-		if desiredEp.weight != nil {
-			c.ResourceRecordSet.SetIdentifier = &desiredEp.id
-			c.ResourceRecordSet.Weight = desiredEp.weight
+		if desiredEp.Weight != nil {
+			c.ResourceRecordSet.SetIdentifier = &desiredEp.Id
+			c.ResourceRecordSet.Weight = desiredEp.Weight
 		}
 
 		// evaluate difference
@@ -190,52 +168,43 @@ func diff(owners []string, zoneName string, desiredEp endpoint, actualEps map[st
 	return changes
 }
 
-func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint, error) {
-	endpoints := make(map[string]endpoint, len(owners))
+func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName string, owners []string, recordType string, id *string) (map[string]endpoint.Endpoint, error) {
+	endpoints := make(map[string]endpoint.Endpoint, len(owners))
 	for _, owner := range owners {
 		fqdn := buildFQDN(owner, zoneName)
-		// owner から始まるrecordsetをリスト
-		params := &route53.ListResourceRecordSetsInput{
-			HostedZoneId:    &zoneId,
-			StartRecordName: aws.String(fqdn),
-		}
-		output, err := p.client.ListResourceRecordSets(ctx, params)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", zoneId)
-		}
 
-		// 一致するレコードを検索
-		ep := endpoint{
-			dnsName: fqdn,
-			class:   recordType,
+		// 一致するレコードをキャッシュから検索
+		ep := endpoint.Endpoint{
+			DnsName: fqdn,
+			Class:   recordType,
 		}
-		for _, r := range output.ResourceRecordSets {
+		for _, r := range (*p.providerZoneCache)[p.cacheKey] {
 			if *r.Name == fqdn {
 				if r.Type == types.RRType(recordType) {
 					// Set rdata or alias target value
 					if r.AliasTarget != nil {
-						ep.aliasTarget.dnsName = *r.AliasTarget.DNSName
-						ep.aliasTarget.hostedZoneId = *r.AliasTarget.HostedZoneId
-						ep.aliasTarget.evaluateAliasTargetHealth = *&r.AliasTarget.EvaluateTargetHealth
+						ep.AliasTarget.DnsName = *r.AliasTarget.DNSName
+						ep.AliasTarget.HostedZoneId = *r.AliasTarget.HostedZoneId
+						ep.AliasTarget.EvaluateAliasTargetHealth = *&r.AliasTarget.EvaluateTargetHealth
 					} else {
 						// TODO: multi value レコードを考慮する
-						ep.rdata = *r.ResourceRecords[0].Value
+						ep.Rdata = *r.ResourceRecords[0].Value
 
 						// set ttl
-						ep.ttl = *r.TTL
+						ep.Ttl = *r.TTL
 					}
 
 					// 一致するIDのレコードだけを対象にする
 					if id != nil {
 						if sid := r.SetIdentifier; sid != nil && *id == *sid {
-							ep.id = *r.SetIdentifier
+							ep.Id = *r.SetIdentifier
 						} else {
 							break
 						}
 					}
 
 					if r.Weight != nil {
-						ep.weight = r.Weight
+						ep.Weight = r.Weight
 					}
 
 					// TODO: owner idの考慮
@@ -249,6 +218,26 @@ func (p *Route53Provider) records(ctx context.Context, zoneId string, zoneName s
 	return endpoints, nil
 }
 
+func (p *Route53Provider) AllRecords(ctx context.Context, zoneName string) ([]types.ResourceRecordSet, error) {
+	result := make([]types.ResourceRecordSet, 0, 100)
+
+	params := &route53.ListResourceRecordSetsInput{
+		HostedZoneId: &p.hostedZoneId,
+	}
+	for isTrunc := true; isTrunc; {
+		output, err := p.client.ListResourceRecordSets(ctx, params)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to list resource records sets for zone %s", p.hostedZoneId)
+		}
+		result = append(result, output.ResourceRecordSets...)
+		isTrunc = output.IsTruncated
+		params.StartRecordName, params.StartRecordType, params.StartRecordIdentifier =
+			output.NextRecordName, output.NextRecordType, output.NextRecordIdentifier
+	}
+
+	return result, nil
+}
+
 func buildFQDN(owner, zone string) string {
 	fqdn := fmt.Sprintf("%s.%s", owner, zone)
 	if !strings.HasSuffix(fqdn, ".") {
@@ -257,10 +246,10 @@ func buildFQDN(owner, zone string) string {
 	return fqdn
 }
 
-func isOwnerOfRecord(rrs types.ResourceRecordSet, ep endpoint, ownerId string) bool {
+func isOwnerOfRecord(rrs types.ResourceRecordSet, ep endpoint.Endpoint, ownerId string) bool {
 	// validate
 	switch {
-	case *rrs.Name != ep.dnsName:
+	case *rrs.Name != ep.DnsName:
 	case rrs.Type != types.RRTypeTxt:
 	case !strings.HasPrefix(*rrs.ResourceRecords[0].Value, recordOwnerPrefix):
 	default:
@@ -269,10 +258,10 @@ func isOwnerOfRecord(rrs types.ResourceRecordSet, ep endpoint, ownerId string) b
 	return false
 }
 
-func buildOwnerRecordValue(ep endpoint, ownerId string) string {
+func buildOwnerRecordValue(ep endpoint.Endpoint, ownerId string) string {
 	value := ownerId
-	if ep.id != "" {
-		value = value + "-" + ep.id
+	if ep.Id != "" {
+		value = value + "-" + ep.Id
 	}
 	return value
 }
